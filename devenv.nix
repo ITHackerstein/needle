@@ -9,4 +9,8 @@
       sync.enable = false;
     };
   };
+
+  # manylinux wheels (numpy, scipy, ...) dlopen system libs that aren't on
+  # nix's loader path by default.
+  env.LD_LIBRARY_PATH = "${lib.makeLibraryPath [ pkgs.zlib pkgs.stdenv.cc.cc.lib ]}:$LD_LIBRARY_PATH";
 }

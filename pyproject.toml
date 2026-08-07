@@ -7,7 +7,13 @@ authors = [
     { name = "Davide Carella", email = "carelladavide1@gmail.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "imbalanced-learn>=0.14.2",
+    "lightgbm>=4.7.0",
+    "numpy>=2.5.1",
+    "pandas>=3.0.5",
+    "scikit-learn>=1.9.0",
+]
 
 [project.scripts]
 machine-learning-project = "machine_learning_project:main"
@@ -15,3 +21,7 @@ machine-learning-project = "machine_learning_project:main"
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.pyright]
+venvPath = ".devenv/state"
+venv = "venv"
