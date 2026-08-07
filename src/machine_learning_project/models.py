@@ -36,7 +36,7 @@ class AutoencoderDetector(BaseEstimator, OutlierMixin):
         hidden_layer_sizes=(20, 8, 20),
         contamination: float = 0.01,
         noise_sigma: float = 0.5,
-        max_iter: int = 100,
+        max_iter: int = 500,
         random_state=None
     ):
         self.hidden_layer_sizes = hidden_layer_sizes
@@ -103,6 +103,9 @@ MODELS = {
     "lgbm": lambda weighted, **kwargs: LGBMClassifier(
         is_unbalance=weighted,
         random_state=SEED,
+        deterministic=True,
+        force_row_wise=True,
+        n_jobs=4,
         verbose=-1,
         **kwargs
     ),

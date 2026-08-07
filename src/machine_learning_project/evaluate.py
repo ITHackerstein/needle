@@ -23,15 +23,27 @@ def at_alert_budget(y_true, y_score, n_alerts: int) -> dict:
     if n_alerts < 1:
         raise ValueError(f"Alert budget must be at least 1, got {n_alerts}.")
 
-    threshold = np.sort(y_score)[::-1][:n_alerts].min()
-    flagged = y_score >= threshold
+    alerts = min(n_alerts, y_score.size)
+    threshold = np.sort(y_score)[::-1][:alerts].min()
 
-    caught = int((flagged & (y_true == 1)).sum())
+    # A saturated classifier can tie thousands of rows at the threshold, so
+    # `>= threshold` would blow the budget wide open. Reviewing exactly `alerts`
+    # rows means taking everything strictly above plus an arbitrary slice of the
+    # tied block, so count the tied block's frauds pro rata: the expected catch
+    # over that arbitrary choice, rather than crediting all of them.
+    above, tied = y_score > threshold, y_score == threshold
+    take = min(alerts - int(above.sum()), int(tied.sum()))
+
+    caught = float((above & (y_true == 1)).sum())
+    if take > 0:
+        caught += int((tied & (y_true == 1)).sum()) * take / int(tied.sum())
+
     return {
-        "alerts": int(flagged.sum()),
-        "precision": caught / max(flagged.sum(), 1),
+        "alerts": alerts,
+        "precision": caught / alerts,
         "recall": caught / max((y_true == 1).sum(), 1),
-        "threshold": float(threshold)
+        "threshold": float(threshold),
+        "tied_at_threshold": int(tied.sum())
     }
 
 def cost(y_true, y_pred, amounts, review_cost: float = REVIEW_COST) -> float:

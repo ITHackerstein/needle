@@ -1,7 +1,17 @@
+import numpy as np
 import pandas as pd
 from machine_learning_project.data import load_data, temporal_split, extract_features, cross_validation_split
 from machine_learning_project.models import CANDIDATES, make_model
 from machine_learning_project.evaluate import cross_validate_candidates, response, summarize, threshold_table
+
+def _holdout(model_name, imbalance_method, X_first, y_first, X_second, y_second, amounts) -> np.ndarray:
+    print(f"\n=== temporal holdout: {model_name} / {imbalance_method} ===")
+    model = make_model(model_name, imbalance_method).fit(X_first, y_first)
+    scores = response(model, X_second)
+
+    for key, value in summarize(y_second, scores, amounts=amounts).items():
+        print(f"  {key:22} {value:.4f}")
+    return scores
 
 def main() -> None:
     pd.set_option("display.width", 200)
@@ -32,14 +42,30 @@ def main() -> None:
     print()
     print(leaderboard.to_string())
 
+    amounts = df["Amount"].iloc[split.test]
     best = leaderboard.iloc[0]
-    print(f"\n=== temporal holdout: {best['model']} / {best['imbalance']} ===")
-    model = make_model(best["model"], best["imbalance"]).fit(X_first, y_first)
-    scores = response(model, X_second)
-
-    for key, value in summarize(y_second, scores, amounts=df["Amount"].iloc[split.test]).items():
-        print(f"  {key:22} {value:.4f}")
+    scores = _holdout(best["model"], best["imbalance"], X_first, y_first, X_second, y_second, amounts)
 
     print(f"\n  CV pr_auc {best['pr_auc_mean']:.4f} -> holdout, gap is the finding")
     print("\n=== operating points (day 2) ===")
-    print(threshold_table(y_second, scores, df["Amount"].iloc[split.test], n_rows=12).to_string())
+    print(threshold_table(y_second, scores, amounts, n_rows=12).to_string())
+
+    # The autoencoder is unlikely to top a leaderboard it shares with supervised
+    # models, but it is the only candidate fit without labels, so what it catches
+    # on day 2 is worth seeing even when it loses.
+    if best["model"] != "autoencoder":
+        autoencoder_scores = _holdout(
+            "autoencoder", "none", X_first, y_first, X_second, y_second, amounts
+        )
+
+        budget = 100
+        frauds = set(np.flatnonzero(y_second.to_numpy() == 1))
+        top = lambda s: set(np.argsort(s)[::-1][:budget]) & frauds
+        caught, caught_autoencoder = top(scores), top(autoencoder_scores)
+
+        print(f"\n=== do they catch the same frauds? (top {budget} alerts each) ===")
+        print(f"  {best['model']:20} {len(caught)}")
+        print(f"  {'autoencoder':20} {len(caught_autoencoder)}")
+        print(f"  {'both':20} {len(caught & caught_autoencoder)}")
+        print(f"  {'autoencoder only':20} {len(caught_autoencoder - caught)}"
+              f"  <- the case for keeping an unsupervised detector")
