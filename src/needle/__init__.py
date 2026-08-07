@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
-from machine_learning_project.data import load_data, temporal_split, extract_features, cross_validation_split
-from machine_learning_project.models import CANDIDATES, make_model
-from machine_learning_project.evaluate import cross_validate_candidates, response, summarize, threshold_table
+from needle.data import load_data, temporal_split, extract_features, cross_validation_split
+from needle.models import CANDIDATES, make_model
+from needle.evaluate import cross_validate_candidates, response, summarize, threshold_table
 
 def _holdout(model_name, imbalance_method, X_first, y_first, X_second, y_second, amounts) -> np.ndarray:
     print(f"\n=== temporal holdout: {model_name} / {imbalance_method} ===")

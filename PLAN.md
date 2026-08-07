@@ -112,7 +112,7 @@ pytest jupyter   # dev
 ```
 
 ```
-src/machine_learning_project/
+src/needle/
   data.py          # load, dedupe, feature engineering
   splits.py        # stratified CV + temporal holdout
   models.py        # pipeline factories per candidate
