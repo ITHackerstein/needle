@@ -2,18 +2,62 @@ import numpy as np
 import pandas as pd
 from needle.data import load_data, temporal_split, extract_features, cross_validation_split
 from needle.models import CANDIDATES, make_model
-from needle.evaluate import cross_validate_candidates, response, summarize, threshold_table
+from needle.evaluate import (
+    candidate_label,
+    cross_validate_candidates,
+    probability,
+    ranking,
+    summarize,
+    threshold_table,
+    unpack_candidate
+)
+# Aliased on purpose: an unaliased `tune` would shadow the needle.tune submodule on
+# the package itself, and `load` sitting next to load_data reads as the wrong thing.
+from needle.tune import (
+    DEFAULT_TUNED,
+    result_path,
+    load as load_tuning,
+    save as save_tuning,
+    tune as tune_model
+)
 
-def _holdout(model_name, imbalance_method, X_first, y_first, X_second, y_second, amounts) -> np.ndarray:
-    print(f"\n=== temporal holdout: {model_name} / {imbalance_method} ===")
-    model = make_model(model_name, imbalance_method).fit(X_first, y_first)
-    scores = response(model, X_second)
+def _holdout(candidate, X_first, y_first, X_second, y_second, amounts) -> tuple:
+    """Returns (ranking scores, probabilities or None) - the first for ranking and
+    fraud-overlap work, the second for anything that reports a threshold.
+    """
+    model_name, imbalance_method, params = unpack_candidate(candidate)
+    print(f"\n=== temporal holdout: {candidate_label(candidate)} ===")
+    model = make_model(model_name, imbalance_method, **params).fit(X_first, y_first)
+    scores, probabilities = ranking(model, X_second), probability(model, X_second)
 
-    for key, value in summarize(y_second, scores, amounts=amounts).items():
+    summary = summarize(y_second, scores, amounts=amounts, threshold_scores=probabilities)
+    for key, value in summary.items():
         print(f"  {key:22} {value:.4f}")
-    return scores
+    return scores, probabilities
 
-def main() -> None:
+def _tuned_candidates(X, y, model_names=DEFAULT_TUNED, retune: bool = False) -> list[tuple]:
+    """Optuna searches on day 1 only, cached under reports/ so reruns stay cheap.
+
+    `revalidate=False` because the leaderboard below re-scores every candidate on the
+    full repeated CV anyway; re-scoring inside the search too would pay for 15 extra
+    fits per model and report the same number twice.
+    """
+    candidates = []
+    for model_name in model_names:
+        path = result_path(model_name)
+        if not retune and path.exists():
+            result = load_tuning(model_name)
+            print(f"  {model_name:20} reusing {path} ({result.n_trials} trials, "
+                  f"search pr_auc={result.search_pr_auc:.4f})")
+        else:
+            print(f"\n  ### searching {model_name} - this is the slow part ###")
+            result = tune_model(model_name, X, y, revalidate=False)
+            print(f"  wrote {save_tuning(result)}")
+
+        candidates.append((result.model, result.imbalance, result.params))
+    return candidates
+
+def main(retune: bool = False) -> None:
     pd.set_option("display.width", 200)
 
     df = load_data("dataset/creditcard.csv")
@@ -27,11 +71,16 @@ def main() -> None:
 
     cv = cross_validation_split()
 
+    print("\n=== hyperparameter search (day 1 only) ===")
+    tuned = _tuned_candidates(X_first, y_first, retune=retune)
+    candidates = list(CANDIDATES) + tuned
+    by_label = {candidate_label(candidate): candidate for candidate in candidates}
+
     print("\n=== model selection (day 1 only) ===")
     rows = []
-    for candidate in CANDIDATES:
+    for candidate in candidates:
         row = cross_validate_candidates(X_first, y_first, [candidate], cv=cv)
-        print(f"  {row.at[0, 'model']:20} {row.at[0, 'imbalance']:8} "
+        print(f"  {row.at[0, 'label']:36} "
               f"pr_auc={row.at[0, 'pr_auc_mean']:.4f} ± {row.at[0, 'pr_auc_std']:.4f} "
               f"({row.at[0, 'fit_seconds']:.1f}s/fit)")
         rows.append(row)
@@ -44,28 +93,12 @@ def main() -> None:
 
     amounts = df["Amount"].iloc[split.test]
     best = leaderboard.iloc[0]
-    scores = _holdout(best["model"], best["imbalance"], X_first, y_first, X_second, y_second, amounts)
+    scores, probabilities = _holdout(
+        by_label[best["label"]], X_first, y_first, X_second, y_second, amounts
+    )
 
     print(f"\n  CV pr_auc {best['pr_auc_mean']:.4f} -> holdout, gap is the finding")
-    print("\n=== operating points (day 2) ===")
-    print(threshold_table(y_second, scores, amounts, n_rows=12).to_string())
-
-    # The autoencoder is unlikely to top a leaderboard it shares with supervised
-    # models, but it is the only candidate fit without labels, so what it catches
-    # on day 2 is worth seeing even when it loses.
-    if best["model"] != "autoencoder":
-        autoencoder_scores = _holdout(
-            "autoencoder", "none", X_first, y_first, X_second, y_second, amounts
-        )
-
-        budget = 100
-        frauds = set(np.flatnonzero(y_second.to_numpy() == 1))
-        top = lambda s: set(np.argsort(s)[::-1][:budget]) & frauds
-        caught, caught_autoencoder = top(scores), top(autoencoder_scores)
-
-        print(f"\n=== do they catch the same frauds? (top {budget} alerts each) ===")
-        print(f"  {best['model']:20} {len(caught)}")
-        print(f"  {'autoencoder':20} {len(caught_autoencoder)}")
-        print(f"  {'both':20} {len(caught & caught_autoencoder)}")
-        print(f"  {'autoencoder only':20} {len(caught_autoencoder - caught)}"
-              f"  <- the case for keeping an unsupervised detector")
+    units = "probability" if probabilities is not None else "decision function"
+    print(f"\n=== operating points (day 2, thresholds in {units} units) ===")
+    table_scores = scores if probabilities is None else probabilities
+    print(threshold_table(y_second, table_scores, amounts, n_rows=12).to_string())

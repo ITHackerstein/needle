@@ -36,12 +36,14 @@ class AutoencoderDetector(BaseEstimator, OutlierMixin):
         hidden_layer_sizes=(20, 8, 20),
         contamination: float = 0.01,
         noise_sigma: float = 0.5,
+        learning_rate_init: float = 0.001,  # MLPRegressor's own default, so stock fits are unchanged
         max_iter: int = 500,
         random_state=None
     ):
         self.hidden_layer_sizes = hidden_layer_sizes
         self.contamination = contamination
         self.noise_sigma = noise_sigma
+        self.learning_rate_init = learning_rate_init
         self.max_iter = max_iter
         self.random_state = random_state
 
@@ -54,6 +56,7 @@ class AutoencoderDetector(BaseEstimator, OutlierMixin):
 
         self.network_ = MLPRegressor(
             hidden_layer_sizes=self.hidden_layer_sizes,
+            learning_rate_init=self.learning_rate_init,
             max_iter=self.max_iter,
             random_state=self.random_state,
             early_stopping=True
