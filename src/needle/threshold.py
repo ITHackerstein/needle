@@ -2,12 +2,8 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 from .models import CandidatePipeline
-from .evaluate import MIN_PRECISION, _take, ranking, probability
-from .data import SEED
-
-REVIEW_COST = 3.0
-ALERT_BUDGET = 100
-OBJECTIVES = ("cost", "precision", "budget")
+from .common import SEED, probability, ranking, take
+from .config import ALERT_BUDGET, MIN_PRECISION, OBJECTIVES, REVIEW_COST
 
 def sweep_thresholds(
     y_true,
@@ -159,9 +155,9 @@ def selection_scores(
     probabilities = np.full(len(y), np.nan)
     for train, test in cv.split(X, y):
         model = candidate.build()
-        model.fit(_take(X, train), _take(y, train))
+        model.fit(take(X, train), take(y, train))
 
-        X_test = _take(X, test)
+        X_test = take(X, test)
         test_ranking = ranking(model, X_test)
         test_probability = probability(model, X_test)
         scores[test] = test_ranking

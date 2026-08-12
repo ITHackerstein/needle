@@ -9,12 +9,11 @@ import optuna
 from sklearn.metrics import average_precision_score
 from sklearn.model_selection import StratifiedKFold
 
-from .data import SEED, cross_validation_split
-from .evaluate import _take, ranking
+from .common import SEED, cross_validation_split, ranking, take
+from .config import REPORTS_DIR
 from .models import CandidatePipeline
 
 SEARCH_FOLDS = 5
-REPORTS_DIR = "reports"
 
 
 @dataclass(frozen=True)
@@ -141,8 +140,8 @@ def _cv_scores(
     scores = []
     for fold, (train, test) in enumerate(cv.split(X, y)):
         model = CandidatePipeline(model_name, imbalance, params).build()
-        model.fit(_take(X, train), _take(y, train))
-        scores.append(float(average_precision_score(_take(y, test), ranking(model, _take(X, test)))))
+        model.fit(take(X, train), take(y, train))
+        scores.append(float(average_precision_score(take(y, test), ranking(model, take(X, test)))))
 
         if trial is not None:
             trial.report(float(np.mean(scores)), fold)
@@ -282,7 +281,7 @@ def tuned_candidate(result: TuningResult) -> CandidatePipeline:
 
 
 def result_path(model_name: str) -> Path:
-    return Path(REPORTS_DIR) / f"tuning_{model_name}.json"
+    return REPORTS_DIR / f"tuning_{model_name}.json"
 
 
 def save_tuning(result: TuningResult, path: os.PathLike | str | None = None) -> Path:

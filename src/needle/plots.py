@@ -13,13 +13,12 @@ import numpy as np
 from pathlib import Path
 from sklearn.metrics import average_precision_score, precision_recall_curve
 from .calibrate import calibration_report
+from .config import REPORTS_DIR
 from .threshold import sweep_thresholds
-
-FIGURES_DIR = Path("reports")
 
 
 def _save(figure, name: str, directory=None) -> Path:
-    path = Path(directory if directory is not None else FIGURES_DIR) / name
+    path = Path(directory if directory is not None else REPORTS_DIR) / name
     path.parent.mkdir(parents=True, exist_ok=True)
     figure.tight_layout()
     figure.savefig(path, dpi=150)

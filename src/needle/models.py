@@ -1,4 +1,4 @@
-from .data import SEED
+from .common import SEED
 from dataclasses import dataclass, field
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline

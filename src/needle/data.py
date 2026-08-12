@@ -2,9 +2,6 @@ import os
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
-from sklearn.model_selection import RepeatedStratifiedKFold
-
-SEED = 42
 
 def load_data(path: os.PathLike | str) -> pd.DataFrame:
     data = pd.read_csv(path, dtype={
@@ -42,6 +39,3 @@ class Split:
 def temporal_split(time, boundary: float = 60 * 60 * 24) -> Split:
     t = np.asarray(time)
     return Split(np.flatnonzero(t < boundary), np.flatnonzero(t >= boundary))
-
-def cross_validation_split(n_splits: int = 5, n_repeats: int = 3, seed: int = SEED) -> RepeatedStratifiedKFold:
-    return RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=seed)

@@ -3,25 +3,8 @@ import pandas as pd
 from sklearn.model_selection import cross_validate
 from sklearn.metrics import make_scorer, precision_recall_curve
 from .models import CandidatePipeline, CANDIDATE_PIPELINES
-from .data import cross_validation_split
-
-MIN_PRECISION = 0.9
-
-
-def _take(data, index):
-    return data.iloc[index] if hasattr(data, "iloc") else np.asarray(data)[index]
-
-
-def ranking(model, X) -> np.ndarray:
-    if hasattr(model, "decision_function"):
-        return model.decision_function(X)
-    return model.predict_proba(X)[:, 1]
-
-
-def probability(model, X) -> np.ndarray | None:
-    if not hasattr(model, "predict_proba"):
-        return None
-    return model.predict_proba(X)[:, 1]
+from .common import cross_validation_split
+from .config import MIN_PRECISION
 
 
 def recall_at_precision(y_true, y_score, min_precision: float = MIN_PRECISION) -> float:
