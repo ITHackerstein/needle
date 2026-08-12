@@ -10,8 +10,8 @@ from sklearn.metrics import average_precision_score
 from sklearn.model_selection import StratifiedKFold
 
 from .data import SEED, cross_validation_split
-from .evaluate import ranking
-from .models import make_model
+from .evaluate import _take, ranking
+from .models import CandidatePipeline
 
 SEARCH_FOLDS = 5
 REPORTS_DIR = "reports"
@@ -129,10 +129,6 @@ def _suggest(trial: optuna.Trial, model_name: str) -> tuple[str, dict]:
     return imbalance, space.params(trial, imbalance)
 
 
-def _take(data, index):
-    return data.iloc[index] if hasattr(data, "iloc") else np.asarray(data)[index]
-
-
 def _cv_scores(
     X,
     y,
@@ -144,7 +140,8 @@ def _cv_scores(
 ) -> list[float]:
     scores = []
     for fold, (train, test) in enumerate(cv.split(X, y)):
-        model = make_model(model_name, imbalance, **params).fit(_take(X, train), _take(y, train))
+        model = CandidatePipeline(model_name, imbalance, params).build()
+        model.fit(_take(X, train), _take(y, train))
         scores.append(float(average_precision_score(_take(y, test), ranking(model, _take(X, test)))))
 
         if trial is not None:
@@ -165,7 +162,7 @@ def _objective(trial: optuna.Trial, model_name: str, X, y, cv) -> float:
     return float(np.mean(scores))
 
 
-def tune(
+def tune_model(
     model_name: str,
     X,
     y,
@@ -266,7 +263,7 @@ def tune_all(
         if verbose:
             print(f"\n### tuning {model_name} "
                   f"({budgets.get(model_name, SPACES[model_name].n_trials)} trials) ###")
-        results[model_name] = tune(
+        results[model_name] = tune_model(
             model_name, X, y, n_trials=budgets.get(model_name), verbose=verbose, **kwargs
         )
 
@@ -280,21 +277,21 @@ def tune_all(
     return results
 
 
-def tuned_model(result: TuningResult):
-    return make_model(result.model, result.imbalance, **result.params)
+def tuned_candidate(result: TuningResult) -> CandidatePipeline:
+    return CandidatePipeline(result.model, result.imbalance, result.params)
 
 
 def result_path(model_name: str) -> Path:
     return Path(REPORTS_DIR) / f"tuning_{model_name}.json"
 
 
-def save(result: TuningResult, path: os.PathLike | str | None = None) -> Path:
+def save_tuning(result: TuningResult, path: os.PathLike | str | None = None) -> Path:
     path = Path(path) if path is not None else result_path(result.model)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(asdict(result), indent=2, sort_keys=True) + "\n")
     return path
 
 
-def load(model_name: str, path: os.PathLike | str | None = None) -> TuningResult:
+def load_tuning(model_name: str, path: os.PathLike | str | None = None) -> TuningResult:
     path = Path(path) if path is not None else result_path(model_name)
     return TuningResult(**json.loads(path.read_text()))

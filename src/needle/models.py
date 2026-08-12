@@ -1,4 +1,5 @@
 from .data import SEED
+from dataclasses import dataclass, field
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline
 from imblearn.under_sampling import RandomUnderSampler
@@ -24,7 +25,7 @@ class NegativeOnlyDetector(BaseEstimator, ClassifierMixin):
         return self
 
     def decision_function(self, X):
-        return -self.detector_.score_samples(X)  # higher = more anomalous
+        return -self.detector_.score_samples(X)
 
     def predict(self, X):
         return (self.detector_.predict(X) == -1).astype(np.uint8)
@@ -36,7 +37,7 @@ class AutoencoderDetector(BaseEstimator, OutlierMixin):
         hidden_layer_sizes=(20, 8, 20),
         contamination: float = 0.01,
         noise_sigma: float = 0.5,
-        learning_rate_init: float = 0.001,  # MLPRegressor's own default, so stock fits are unchanged
+        learning_rate_init: float = 0.001,
         max_iter: int = 500,
         random_state=None
     ):
@@ -134,21 +135,35 @@ SAMPLERS = {
     "none": lambda: None
 }
 
-CANDIDATES = (
-    [("dummy", "none")]
-    + [(model_name, imbalance_method)
-       for model_name in ("logistic_regression", "random_forest", "lgbm")
-       for imbalance_method in ("weighted", "under", "smote")]
-    + [("isolation_forest", "none")]
-    + [("autoencoder", "none")]
+@dataclass(frozen=True)
+class CandidatePipeline:
+    model_name: str
+    imbalance_method: str
+    params: dict = field(default_factory=dict)
+
+    def label(self) -> str:
+        return f"{self.model_name}/{self.imbalance_method}{' (tuned)' if self.params else ''}"
+
+    def build(self) -> Pipeline:
+        if self.model_name not in MODELS:
+            raise ValueError(f"Model '{self.model_name}' is not supported.")
+
+        steps = [("preprocessing", _preprocessing(scale_all=self.model_name in SCALED_MODELS))]
+        if sampler := SAMPLERS[self.imbalance_method]():
+            steps.append(("sampler", sampler))
+        steps.append((
+            "classifier",
+            MODELS[self.model_name](weighted=(self.imbalance_method == "weighted"), **self.params)
+        ))
+        return Pipeline(steps)
+
+CANDIDATE_PIPELINES = (
+    CandidatePipeline("dummy", "none"),
+    *(
+        CandidatePipeline(model_name, imbalance_method)
+        for model_name in ("logistic_regression", "random_forest", "lgbm")
+        for imbalance_method in ("weighted", "under", "smote")
+    ),
+    CandidatePipeline("isolation_forest", "none"),
+    CandidatePipeline("autoencoder", "none")
 )
-
-def make_model(model_name, imbalance_method: str = "weighted", **kwargs):
-    if model_name not in MODELS:
-        raise ValueError(f"Model '{model_name}' is not supported.")
-
-    steps = [("preprocessing", _preprocessing(scale_all=model_name in SCALED_MODELS))]
-    if sampler := SAMPLERS[imbalance_method]():
-        steps.append(("sampler", sampler))
-    steps.append(("classifier", MODELS[model_name](weighted=(imbalance_method == "weighted"), **kwargs)))
-    return Pipeline(steps)

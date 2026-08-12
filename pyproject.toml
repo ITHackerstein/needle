@@ -10,6 +10,7 @@ requires-python = ">=3.13"
 dependencies = [
     "imbalanced-learn>=0.14.2",
     "lightgbm>=4.7.0",
+    "matplotlib>=3.10.8",
     "numpy>=2.5.1",
     "optuna>=4.9.0",
     "pandas>=3.0.5",
