@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from dataclasses import dataclass, field
 from pathlib import Path
+from .common import recall_key
 from .config import ALERT_BUDGET, MIN_PRECISION, REPORTS_DIR, REVIEW_COST, SHAP_FEATURES
 
 
@@ -28,6 +29,14 @@ class Findings:
     shap_rows: int = 0
     explainer: str = ""
     figures: list[Path] = field(default_factory=list)
+
+    # the economics the run was scored against, so the prose quotes the run and
+    # not the defaults it may have been overridden with
+    min_precision: float = MIN_PRECISION
+    review_cost: float = REVIEW_COST
+    alert_budget: int = ALERT_BUDGET
+    shap_features: int = SHAP_FEATURES
+    reports_dir: Path = REPORTS_DIR
 
 
 def _cell(value, precision: int) -> str:
@@ -97,7 +106,7 @@ def _operating_points(findings: Findings) -> pd.DataFrame:
 def _metric_choice(findings: Findings) -> str:
     roc_auc, pr_auc = findings.holdout.get("roc_auc", float("nan")), findings.holdout["pr_auc"]
     rows, frauds = findings.day_two
-    recall_at_p = findings.holdout.get(f"recall_at_p{int(MIN_PRECISION * 100)}", float("nan"))
+    recall_at_p = findings.holdout.get(recall_key(findings.min_precision), float("nan"))
 
     return f"""## 1. The metric, and why it is not ROC-AUC
 
@@ -111,9 +120,9 @@ Reported here, in order of what they decide:
 
 - **PR-AUC (average precision)** — the primary, threshold-free metric. Model selection ranks on
   it and the Optuna search optimises it.
-- **Recall at precision >= {MIN_PRECISION:.0%}** — {recall_at_p:.4f} on day 2. What a fraud team
+- **Recall at precision >= {findings.min_precision:.0%}** — {recall_at_p:.4f} on day 2. What a fraud team
   buys: the share of fraud caught while most alerts are still genuine.
-- **Cost = missed amount + {REVIEW_COST:g} x false positives** — used to pick the threshold, and
+- **Cost = missed amount + {findings.review_cost:g} x false positives** — used to pick the threshold, and
   the only number here that treats a missed EUR 2,000 fraud differently from a missed EUR 5 one.
 - **ROC-AUC** — kept for comparability with published results on this dataset, where 0.97-0.98 is
   unremarkable and says almost nothing about deployability."""
@@ -138,7 +147,7 @@ Day 2 ({rows_two:,} rows, {frauds_two} frauds) is scored once, at the end.
 - **The threshold is chosen on day-1 out-of-fold scores**, not on day 2, and not on the same
   rows the model was fitted to.
 - **The search never saw day 2.** Tuning ran on day-1 folds only.
-- Seed {findings.seed} throughout, recorded with every tuning result under `reports/`.
+- Seed {findings.seed} throughout, recorded with every tuning result under `{findings.reports_dir}/`.
 
 ### Cross-validation against the temporal holdout
 
@@ -166,7 +175,7 @@ scores — never left at 0.5 — and the other two rows are what that same decis
 
 Read as a review queue: **{kept['alerts_per_day']:.0f} alerts on day 2** ({kept['alert_rate'] * 100:.3f}% of transactions), {caught} of them fraud and {false_positives:,} not.
 That is precision **{kept['precision']:.1%}** at recall **{kept['recall']:.1%}** of the {frauds} frauds present.
-A team that can review {ALERT_BUDGET} transactions a day would have to cut the queue to its top {ALERT_BUDGET / max(kept['alerts_per_day'], 1) * 100:.0f}%.
+A team that can review {findings.alert_budget} transactions a day would have to cut the queue to its top {findings.alert_budget / max(kept['alerts_per_day'], 1) * 100:.0f}%.
 
 The threshold was picked once and carried unchanged, which is the deployable move. Holding the
 *alert rate* fixed instead lands at {rate['alerts_per_day']:.0f} alerts and recall {rate['recall']:.1%};
@@ -182,7 +191,7 @@ Skipped: the winning model has no SHAP explainer available (an unsupervised dete
 tree or linear structure to read)."""
 
     ranking = findings.shap_ranking
-    top = ranking.head(SHAP_FEATURES)
+    top = ranking.head(findings.shap_features)
     leaders = ", ".join(f"`{name}`" for name in ranking["feature"].head(3))
     concentration = float(ranking["share"].head(5).sum())
 
@@ -268,7 +277,7 @@ def _limitations(findings: Findings) -> str:
   out domain sanity checks, feature repair, and any claim that the model is using something a
   fraud team would endorse.
 - **The cost model is an assumption.** It prices a missed fraud at the full transaction amount
-  and a review at a flat {REVIEW_COST:g}. Real recovery rates, chargeback fees, and the cost of
+  and a review at a flat {findings.review_cost:g}. Real recovery rates, chargeback fees, and the cost of
   a wrongly blocked customer are all missing, and the cost-optimal threshold moves with them —
   the sensitivity table in the run output shows how far.
 - **One seed, one dataset.** The winner beat the runner-up by less than the fold-to-fold

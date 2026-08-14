@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.model_selection import cross_validate
 from sklearn.metrics import make_scorer, precision_recall_curve
 from .models import CandidatePipeline, CANDIDATE_PIPELINES
-from .common import cross_validation_split
+from .common import cross_validation_split, recall_key
 from .config import MIN_PRECISION
 
 
@@ -14,20 +14,27 @@ def recall_at_precision(y_true, y_score, min_precision: float = MIN_PRECISION) -
     return float(at_precision.max()) if at_precision.size > 0 else 0.0
 
 
-SCORING = {
-    "pr_auc": "average_precision",
-    "roc_auc": "roc_auc",
-    f"recall_at_p{int(MIN_PRECISION * 100)}": make_scorer(recall_at_precision, response_method=("decision_function", "predict_proba"))
-}
+def scoring(min_precision: float = MIN_PRECISION) -> dict:
+    return {
+        "pr_auc": "average_precision",
+        "roc_auc": "roc_auc",
+        recall_key(min_precision): make_scorer(
+            recall_at_precision,
+            response_method=("decision_function", "predict_proba"),
+            min_precision=min_precision
+        )
+    }
 
 
 def cross_validate_candidates(
     X, y,
     candidates: tuple[CandidatePipeline, ...] = CANDIDATE_PIPELINES,
     cv=None,
-    n_jobs: int = 1
+    n_jobs: int = 1,
+    min_precision: float = MIN_PRECISION
 ) -> pd.DataFrame:
     cv = cv if cv is not None else cross_validation_split()
+    metrics = scoring(min_precision)
 
     rows = []
     for candidate in candidates:
@@ -35,7 +42,7 @@ def cross_validate_candidates(
             candidate.build(),
             X, y,
             cv=cv,
-            scoring=SCORING,
+            scoring=metrics,
             n_jobs=n_jobs
         )
 
@@ -46,7 +53,7 @@ def cross_validate_candidates(
             "tuned": bool(candidate.params)
         }
 
-        for metric in SCORING:
+        for metric in metrics:
             row[f"{metric}_mean"] = result[f"test_{metric}"].mean()
             row[f"{metric}_std"] = result[f"test_{metric}"].std()
         row["fit_seconds"] = result["fit_time"].mean()

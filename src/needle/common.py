@@ -3,6 +3,11 @@ from sklearn.model_selection import RepeatedStratifiedKFold
 
 SEED = 42
 
+def recall_key(min_precision: float) -> str:
+    # NOTE: the metric's name follows its threshold, so it has one spelling everywhere
+    return f"recall_at_p{int(min_precision * 100)}"
+
+
 def take(data, index):
     return data.iloc[index] if hasattr(data, "iloc") else np.asarray(data)[index]
 

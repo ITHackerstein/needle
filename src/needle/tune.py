@@ -280,8 +280,9 @@ def tuned_candidate(result: TuningResult) -> CandidatePipeline:
     return CandidatePipeline(result.model, result.imbalance, result.params)
 
 
-def result_path(model_name: str) -> Path:
-    return REPORTS_DIR / f"tuning_{model_name}.json"
+def result_path(model_name: str, directory=None) -> Path:
+    directory = Path(directory if directory is not None else REPORTS_DIR)
+    return directory / f"tuning_{model_name}.json"
 
 
 def save_tuning(result: TuningResult, path: os.PathLike | str | None = None) -> Path:
