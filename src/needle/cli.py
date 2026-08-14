@@ -110,11 +110,13 @@ def main(argv: list[str] | None = None) -> int:
     settings = _settings(arguments)
 
     try:
+        # NOTE: imported here and not at module scope so --help and --version do not
+        # pay for lightgbm, shap and matplotlib
         if arguments.command == "tune":
-            from . import search
+            from .pipeline import search
             search(settings, revalidate=arguments.revalidate)
         else:
-            from . import run
+            from .pipeline import run
             run(settings)
     except FileNotFoundError as error:
         print(f"needle: {error.filename or error}: no such file", file=sys.stderr)
