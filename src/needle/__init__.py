@@ -1,7 +1,7 @@
 import pandas as pd
 from sklearn.metrics import average_precision_score, roc_auc_score
-from needle import plots
-from needle.common import cross_validation_split, probability, ranking
+from needle import interpret, plots
+from needle.common import SEED, cross_validation_split, probability, ranking, take
 from needle.config import MIN_PRECISION, OBJECTIVES
 from needle.data import load_data, temporal_split, extract_features
 from needle.models import CANDIDATE_PIPELINES
@@ -15,6 +15,7 @@ from needle.threshold import (
     threshold_table
 )
 from needle.calibrate import calibrated_candidate, calibration_report
+from needle.report import Findings, write_summary
 from needle.tune import (
     DEFAULT_TUNED,
     load_tuning,
@@ -32,13 +33,14 @@ def _holdout(candidate, X_first, y_first, X_second, y_second) -> tuple:
     model = candidate.build().fit(X_first, y_first)
     scores, probabilities = ranking(model, X_second), probability(model, X_second)
 
-    for name, value in (
-        ("pr_auc", average_precision_score(y_second, scores)),
-        ("roc_auc", roc_auc_score(y_second, scores)),  # secondary, for comparability only
-        (f"recall_at_p{int(MIN_PRECISION * 100)}", recall_at_precision(y_second, scores))
-    ):
+    metrics = {
+        "pr_auc": float(average_precision_score(y_second, scores)),
+        "roc_auc": float(roc_auc_score(y_second, scores)),  # secondary, for comparability only
+        f"recall_at_p{int(MIN_PRECISION * 100)}": recall_at_precision(y_second, scores)
+    }
+    for name, value in metrics.items():
         print(f"  {name:22} {value:.4f}")
-    return scores, probabilities
+    return model, scores, probabilities, metrics
 
 def _tuned_candidates(X, y, model_names=DEFAULT_TUNED, retune: bool = False) -> list:
     candidates = []
@@ -75,18 +77,37 @@ def _operating_point(candidate, X, y, amounts) -> tuple[dict, "pd.Series"]:
           f"the top {chosen['alert_rate'] * 100:.3f}% of transactions")
     return chosen, validation_scores
 
-def _transfer(chosen: dict, y_true, y_score, amounts) -> dict:
+def _transfer(chosen: dict, y_true, y_score, amounts) -> tuple[dict, dict]:
     print("\n=== the chosen point, carried to day 2 ===")
+    by_threshold = apply_threshold(y_true, y_score, chosen["threshold"], amounts)
     by_rate = apply_threshold(
         y_true, y_score, threshold_from_rate(y_score, chosen["alert_rate"]), amounts
     )
     rows = {
         "expected (day 1 out-of-fold)": chosen,
-        "achieved (same threshold)": apply_threshold(y_true, y_score, chosen["threshold"], amounts),
+        "achieved (same threshold)": by_threshold,
         "achieved (same alert rate)": by_rate
     }
     print(pd.DataFrame(rows).T[POINT_COLUMNS].astype(float).to_string())
-    return by_rate
+    return by_threshold, by_rate
+
+def _interpretation(model, X, y, y_score, amounts, threshold: float) -> tuple:
+    print("\n=== what the model uses (SHAP, day 2) ===")
+    sample = interpret.explanation_sample(y)
+    explanation = interpret.explain(model, take(X, sample))
+
+    print(f"\n=== the shipped threshold on day 2 ({threshold:.6g}) ===")
+    missed = interpret.missed_frauds(y, y_score, threshold, amounts)
+    print(missed.confusion.to_string())
+
+    print("\n  the frauds, by what they were worth:")
+    print(missed.by_outcome.to_string())
+    print(f"\n  the misses carry {missed.missed_amount_share:.1%} of the fraudulent amount")
+
+    print("\n  the largest ones that got through:")
+    print(missed.worst.to_string(index=False))
+    return explanation, missed, sample
+
 
 def _calibration(candidate, X_first, y_first, X_second, y_second, raw_probabilities):
     if raw_probabilities is None:
@@ -144,18 +165,22 @@ def main(retune: bool = False) -> None:
     winner = by_label[best["label"]]
     chosen, validation_scores = _operating_point(winner, X_first, y_first, amounts_first)
 
-    scores, probabilities = _holdout(winner, X_first, y_first, X_second, y_second)
+    model, scores, probabilities, holdout = _holdout(winner, X_first, y_first, X_second, y_second)
     print(f"\n  CV pr_auc {best['pr_auc_mean']:.4f} -> holdout, gap is the finding")
 
     units = "probability" if probabilities is not None else "decision function"
     table_scores = scores if probabilities is None else probabilities
-    achieved = _transfer(chosen, y_second, table_scores, amounts_second)
+    kept, achieved = _transfer(chosen, y_second, table_scores, amounts_second)
 
     print(f"\n=== operating points (day 2, thresholds in {units} units) ===")
     print(threshold_table(y_second, table_scores, amounts_second, n_rows=12).to_string())
 
     calibrated_probabilities = _calibration(
         winner, X_first, y_first, X_second, y_second, probabilities
+    )
+
+    explanation, missed, sample = _interpretation(
+        model, X_second, y_second, table_scores, amounts_second, kept["threshold"]
     )
 
     print("\n=== figures ===")
@@ -167,8 +192,11 @@ def main(retune: bool = False) -> None:
             },
             chosen=achieved
         ),
-        plots.cost_vs_alerts(y_second, table_scores, amounts_second, chosen=achieved)
+        plots.cost_vs_alerts(y_second, table_scores, amounts_second, chosen=achieved),
+        plots.missed_frauds(y_second, table_scores, amounts_second, kept["threshold"])
     ]
+    if explanation is not None:
+        figures.append(plots.shap_beeswarm(explanation.values, explanation.features))
     if calibrated_probabilities is not None:
         figures.append(plots.reliability({
             "raw": (y_second, probabilities),
@@ -176,3 +204,29 @@ def main(retune: bool = False) -> None:
         }))
     for path in figures:
         print(f"  wrote {path}")
+
+    print("\n=== summary ===")
+    summary = write_summary(Findings(
+        seed=SEED,
+        day_one=(len(X_first), int(y_first.sum())),
+        day_two=(len(X_second), int(y_second.sum())),
+        winner=winner.label(),
+        params=winner.params,
+        leaderboard=leaderboard,
+        cv_pr_auc=float(best["pr_auc_mean"]),
+        cv_pr_auc_std=float(best["pr_auc_std"]),
+        holdout=holdout,
+        chosen=chosen,
+        kept_threshold=kept,
+        kept_rate=achieved,
+        confusion=missed.confusion,
+        by_outcome=missed.by_outcome,
+        worst_missed=missed.worst,
+        missed_amount_share=missed.missed_amount_share,
+        units=units,
+        shap_ranking=None if explanation is None else explanation.ranking(),
+        shap_rows=len(sample),
+        explainer="" if explanation is None else explanation.explainer,
+        figures=figures
+    ))
+    print(f"  wrote {summary}")

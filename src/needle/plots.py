@@ -10,10 +10,12 @@ matplotlib.use("Agg")  # written to reports/, never shown, so never require a di
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from pathlib import Path
 from sklearn.metrics import average_precision_score, precision_recall_curve
 from .calibrate import calibration_report
-from .config import REPORTS_DIR
+from .common import SEED
+from .config import REPORTS_DIR, SHAP_FEATURES
 from .threshold import sweep_thresholds
 
 
@@ -139,5 +141,102 @@ def reliability(curves: dict, n_bins: int = 10,
     axis.set_ylabel("observed fraud rate")
     axis.set_title("Reliability")
     axis.legend(loc="upper left", fontsize=8)
+    axis.grid(alpha=0.3, which="both")
+    return _save(figure, name, directory)
+
+
+def _percentile(values: np.ndarray) -> np.ndarray:
+    """Rank-normalise to [0, 1] so a single outlier cannot own the whole colour scale."""
+    order = np.argsort(values, stable=True)
+    ranks = np.empty(values.size, dtype=np.float64)
+    ranks[order] = np.arange(values.size)
+    return ranks / max(values.size - 1, 1)
+
+
+def _swarm(values: np.ndarray, spread: float = 0.32, bins: int = 40, seed: int = SEED) -> np.ndarray:
+    """Vertical offsets whose width follows how crowded that slice of the axis is.
+
+    Uniform jitter would make a spike at zero - where nearly every point sits, this
+    being a fraud model - look as wide as the tail that actually matters.
+    """
+    counts, edges = np.histogram(values, bins=bins)
+    crowding = counts[np.clip(np.searchsorted(edges, values, side="right") - 1, 0, bins - 1)]
+    scale = np.sqrt(crowding / max(counts.max(), 1))
+    return np.random.default_rng(seed).uniform(-1.0, 1.0, values.size) * spread * scale
+
+
+def shap_beeswarm(values, features: pd.DataFrame, n_features: int = SHAP_FEATURES,
+                  name: str = "shap_beeswarm.png", directory=None) -> Path:
+    """One row per feature, one dot per explained transaction, coloured by feature value.
+
+    The §5 deliverable. The x axis is the model's own score unit (log-odds for the
+    boosted trees), so distance from zero is how far that feature moved that
+    transaction up or down the review queue.
+    """
+    values = np.asarray(values, dtype=np.float64)
+    ordered = np.argsort(np.abs(values).mean(axis=0))[-n_features:]  # least important first
+
+    figure, axis = plt.subplots(figsize=(7.5, 0.34 * len(ordered) + 1.8))
+    axis.axvline(0, linewidth=1, color="grey", zorder=1)
+
+    dots = None
+    for row, column in enumerate(ordered):
+        contribution = values[:, column]
+        dots = axis.scatter(
+            contribution, row + _swarm(contribution),
+            c=_percentile(features.iloc[:, column].to_numpy(dtype=np.float64)),
+            cmap="coolwarm", vmin=0.0, vmax=1.0,
+            s=7, alpha=0.65, linewidths=0, zorder=2
+        )
+
+    axis.set_yticks(range(len(ordered)), [features.columns[column] for column in ordered])
+    axis.set_ylim(-0.7, len(ordered) - 0.3)
+    axis.set_xlabel("SHAP value (contribution towards fraud)")
+    axis.set_title(f"What the model uses: top {len(ordered)} features")
+    axis.grid(axis="x", alpha=0.3)
+
+    if dots is not None:
+        figure.colorbar(dots, ax=axis, pad=0.02).set_label(
+            "feature value (percentile)", fontsize=8
+        )
+    return _save(figure, name, directory)
+
+
+def missed_frauds(y_true, y_score, amounts, threshold: float,
+                  name: str = "missed_frauds.png", directory=None) -> Path:
+    """Every fraud placed by amount against the score it got, with the threshold drawn.
+
+    Answers the question §5 asks about false negatives directly: if the misses sit
+    in the bottom-left they are cheap, and if any sit in the bottom-right they are
+    the ones worth another feature.
+    """
+    y_true, y_score = np.asarray(y_true), np.asarray(y_score)
+    amounts = np.asarray(amounts, dtype=np.float64)
+
+    frauds = np.flatnonzero(y_true == 1)
+    caught = y_score[frauds] >= threshold
+
+    figure, axis = plt.subplots(figsize=(6.5, 5))
+    for label, mask, colour in (
+        (f"caught ({int(caught.sum())})", caught, "tab:green"),
+        (f"missed ({int((~caught).sum())})", ~caught, "crimson")
+    ):
+        selected = frauds[mask]
+        axis.scatter(np.maximum(amounts[selected], 0.01), y_score[selected],
+                     s=22, alpha=0.75, color=colour, linewidths=0, label=label)
+
+    axis.axhline(threshold, linestyle="--", linewidth=1, color="black",
+                 label=f"threshold {threshold:.4g}")
+    axis.set_xscale("log")
+    # A decision function can be negative; only probabilities earn a log score axis.
+    if threshold > 0 and y_score[frauds].min() > 0:
+        axis.set_yscale("log")
+    axis.set_xlabel(
+        "transaction amount (log, zeros pinned to 0.01)" if amounts[frauds].min() <= 0
+        else "transaction amount (log)"
+    )
+    axis.set_ylabel("model score")
+    axis.set_title("Frauds by amount and score, at the shipped threshold")
+    axis.legend(loc="lower right", fontsize=8)
     axis.grid(alpha=0.3, which="both")
     return _save(figure, name, directory)
