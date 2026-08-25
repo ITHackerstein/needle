@@ -52,7 +52,9 @@ uv run needle run --no-plots --no-report     # numbers on stdout only
 | `--shap-sample` | `4000` | legitimate transactions to explain; every fraud is kept regardless |
 | `--shap-features` | `15` | features in the beeswarm and the ranking table |
 | `--seed` | `42` | splits, the search, and the estimators |
-| `--no-plots`, `--no-report` | on | skip the figures / `summary.md` |
+| `--alpha` | `0.05` | significance level for the paired comparison of the top candidates |
+| `--compare` | `6` | leaderboard rows to test the winner against |
+| `--no-plots`, `--no-report`, `--no-tests` | on | skip the figures / `summary.md` / the paired test |
 | `-q`, `--quiet` | off | only errors; the files are still written |
 
 The three economic flags change what the run *decides*, not just what it prints: `--review-cost`
@@ -78,7 +80,7 @@ Into `--reports-dir` (default `reports/`):
 
 | File | |
 |---|---|
-| `summary.md` | the report: metric choice, splits, SHAP ranking, operating point, misses, limitations |
+| `summary.md` | the report: metric choice, splits, whether the leaderboard order is real, SHAP ranking, operating point, misses, limitations |
 | `precision_recall.png` | day-1 out-of-fold against day-2 holdout, with the shipped point marked |
 | `cost_vs_alerts.png` | amount-weighted cost against queue size |
 | `missed_frauds.png` | the frauds that got through, by amount and score |

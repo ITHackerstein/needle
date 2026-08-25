@@ -15,6 +15,9 @@ OBJECTIVE = "cost"
 SHAP_SAMPLE = 4000   # legitimate transactions explained; every fraud is kept regardless
 SHAP_FEATURES = 15   # rows in the beeswarm and in the ranking table
 
+ALPHA = 0.05
+N_COMPARE = 6        # leaderboard rows the winner is tested against, matching the report's table
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -30,14 +33,19 @@ class Settings:
     alert_budget: int = ALERT_BUDGET
     shap_sample: int = SHAP_SAMPLE
     shap_features: int = SHAP_FEATURES
+    alpha: float = ALPHA
+    n_compare: int = N_COMPARE
 
     models: tuple[str, ...] | None = None   # None -> tune.DEFAULT_TUNED
     trials: int | None = None               # None -> the per-model budget in tune.SPACES
     retune: bool = False
     plots: bool = True
     report: bool = True
+    tests: bool = True
     quiet: bool = False
 
     def __post_init__(self):
         if self.objective not in OBJECTIVES:
             raise ValueError(f"objective must be one of {OBJECTIVES}, got {self.objective!r}")
+        if not 0.0 < self.alpha < 1.0:
+            raise ValueError(f"alpha must be between 0 and 1, got {self.alpha}")

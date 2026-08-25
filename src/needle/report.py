@@ -1,9 +1,11 @@
 import numpy as np
 import pandas as pd
+import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
-from .common import recall_key
-from .config import ALERT_BUDGET, MIN_PRECISION, REPORTS_DIR, REVIEW_COST, SHAP_FEATURES
+from .common import CV_REPEATS, CV_SPLITS, recall_key
+from .compare import variance_inflation
+from .config import ALERT_BUDGET, ALPHA, MIN_PRECISION, REPORTS_DIR, REVIEW_COST, SHAP_FEATURES
 
 
 @dataclass(frozen=True)
@@ -25,6 +27,8 @@ class Findings:
     worst_missed: pd.DataFrame
     missed_amount_share: float
     units: str
+    comparisons: pd.DataFrame | None = None   # winner against the leaderboard's next rows
+    n_folds: int = CV_SPLITS * CV_REPEATS
     shap_ranking: pd.DataFrame | None = None
     shap_rows: int = 0
     explainer: str = ""
@@ -35,6 +39,7 @@ class Findings:
     min_precision: float = MIN_PRECISION
     review_cost: float = REVIEW_COST
     alert_budget: int = ALERT_BUDGET
+    alpha: float = ALPHA
     shap_features: int = SHAP_FEATURES
     reports_dir: Path = REPORTS_DIR
 
@@ -86,6 +91,22 @@ def _table(
         for row in rows
     ]
     return "\n".join(lines)
+
+
+def fill(text: str, width: int = 100, indent: str = "") -> str:
+    # NOTE: assembled prose gets the same wrap as the hand-written paragraphs around it, so the
+    # raw markdown stays readable in a diff. break_long_words stays off so a `back-quoted/label`
+    # is never split across lines.
+    return textwrap.fill(
+        text, width=width, subsequent_indent=indent,
+        break_long_words=False, break_on_hyphens=False
+    )
+
+
+def _p(value: float) -> str:
+    # NOTE: these p-values span 1.0 down to 1e-16, so fixed notation would lose every convincing
+    # one to '0.000' and scientific notation would print a plain 1.0 as '1e+00'
+    return f"{value:.3f}" if value >= 5e-4 else f"{value:.2e}"
 
 
 def _point(name: str, point: dict) -> pd.DataFrame:
@@ -160,13 +181,113 @@ either side of the ones it is scored on, and the temporal split does not. The ho
 for a fresh day is the holdout number; anything quoted from cross-validation alone is optimistic."""
 
 
+def _verdict(findings: Findings) -> str:
+    frame = findings.comparisons
+    tied = frame.loc[~frame["significant"], "label"].tolist()
+    separated, total = len(frame) - len(tied), len(frame)
+    runner_up = frame.iloc[0]
+    listed = ", ".join(f"`{label}`" for label in tied)
+
+    # NOTE: the leaderboard is sorted on the mean of these very folds, so the gap is normally
+    # positive; the sign is read anyway rather than assumed, since the family is an argument
+    gap = float(runner_up["difference"])
+    lead = (
+        f"The runner-up, `{runner_up['label']}`, sits {abs(gap):.4f} PR-AUC "
+        f"{'below' if gap >= 0 else 'above'} the winner, and that gap "
+        + ("survives" if bool(runner_up["significant"]) else "does not survive")
+        + f" the test (corrected p={_p(runner_up['p_value'])}, Holm-adjusted "
+          f"{_p(runner_up['p_holm'])})."
+    )
+
+    if separated == total:
+        return (f"{lead} So do all {total} of the challengers tested: the top of this leaderboard "
+                f"is a real ordering and not a tie.")
+    if separated == 0:
+        return (f"{lead} Neither does any of the other {total - 1}. On {findings.n_folds} folds of "
+                f"one day's transactions this experiment cannot separate {listed} from the winner "
+                f"at all - the leaderboard has an order because floats always do, not because the "
+                f"data supports one.")
+    return (f"{lead} {separated} of the {total} challengers "
+            f"{'is' if separated == 1 else 'are'} separated from the winner; {listed} "
+            f"{'is' if len(tied) == 1 else 'are'} not, and should be read as tied with it rather "
+            f"than beaten by it.")
+
+
+def _significance(findings: Findings) -> str:
+    if findings.comparisons is None or findings.comparisons.empty:
+        return """## 3. Is the leaderboard order real?
+
+Skipped: the run passed `--no-tests`, or only one candidate was scored."""
+
+    frame = findings.comparisons
+    candidates = len(findings.leaderboard)
+    inflation = variance_inflation(findings.n_folds)
+    table = _table(frame, precision={
+        "difference": 4, "t": 2, "p_value": 4, "p_holm": 4, "p_naive": 4
+    })
+
+    gap = abs(float(frame.iloc[0]["difference"]))
+    motive = fill(
+        f"The winner leads the runner-up by {gap:.4f} PR-AUC against the fold-to-fold spread of "
+        f"{findings.cv_pr_auc_std:.4f} quoted above - a lead "
+        + ("narrower" if gap < findings.cv_pr_auc_std else "wider")
+        + " than the noise it was measured in, which is reason to test the ordering rather than "
+          "assert it."
+    )
+
+    return f"""## 3. Is the leaderboard order real?
+
+{motive}
+
+Every candidate was scored on the *same* {findings.n_folds} folds - one `RepeatedStratifiedKFold`, built once and
+handed to each pipeline - so the scores pair up fold for fold and the comparison can be paired.
+
+{table}
+
+`difference` is the winner's mean PR-AUC advantage over that row. `p_value` is corrected as
+described below, `p_holm` is that value adjusted across the family, and `p_naive` is what an
+uncorrected paired t-test would have claimed.
+
+### Why the naive p-value is wrong
+
+{findings.n_folds} folds are not {findings.n_folds} independent measurements. Any two of the {CV_SPLITS} training sets in a
+repeat share {CV_SPLITS - 2} of their {CV_SPLITS - 1} folds, and the {CV_REPEATS} repeats reuse every row in day 1. A plain
+paired t-test divides the variance of the differences by {findings.n_folds} anyway, which *is* the independence
+assumption, and the denominator it produces is far too small - it reports fold noise as a finding.
+
+The corrected resampled t-test (Nadeau & Bengio, in the form Bouckaert & Frank recommend for
+repeated k-fold) replaces `1/n` with `1/n + |test|/|train|`. Holding out one fold of {CV_SPLITS} fixes that
+ratio at 1/{CV_SPLITS - 1} regardless of row count, which inflates the variance by {inflation:.2f}x and shrinks every
+t-statistic by {inflation ** 0.5:.2f}x. Comparing the two p-value columns is the cheapest illustration of how
+much a naive test overstates on this dataset.
+
+The family is the {len(frame)} comparisons above and was fixed before any p-value was read; the p-values
+are Holm-corrected across it, because testing the winner against {len(frame)} challengers on one set of
+folds is {len(frame)} chances at a gap that is not there. Every pair of the {candidates} candidates scored would
+have been {candidates * (candidates - 1) // 2} tests, which turns up a "significant" difference somewhere by construction.
+
+### What it says
+
+{fill(_verdict(findings))}
+
+Two things this does not establish:
+
+- **The winner was chosen on these same folds.** Taking the highest mean and then testing it
+  against the rest is post-selection inference. These p-values are optimistic in a way the
+  variance correction does nothing about, and the honest version needs a held-out selection set
+  the {findings.day_one[1]} day-1 frauds cannot really afford.
+- **Nothing here changed what ships.** The model carried to day 2 is still the top of the
+  leaderboard, not "the cheapest candidate that survives the test". That rule would be the
+  better engineering call and it is a different decision from this one."""
+
+
 def _operating_point_section(findings: Findings) -> str:
     chosen, kept, rate = findings.chosen, findings.kept_threshold, findings.kept_rate
     caught = int(findings.confusion.at["fraud", "alerted"])
     frauds = int(findings.confusion.loc["fraud"].sum())
     false_positives = int(findings.confusion.at["legit", "alerted"])
 
-    return f"""## 4. The operating point
+    return f"""## 5. The operating point
 
 Thresholds are in {findings.units} units. The shipped one minimises cost on day-1 out-of-fold
 scores — never left at 0.5 — and the other two rows are what that same decision did on day 2.
@@ -185,7 +306,7 @@ argument for alarming on alert volume rather than trusting a frozen threshold fo
 
 def _interpretation(findings: Findings) -> str:
     if findings.shap_ranking is None:
-        return """## 3. What the model uses
+        return """## 4. What the model uses
 
 Skipped: the winning model has no SHAP explainer available (an unsupervised detector with no
 tree or linear structure to read)."""
@@ -201,7 +322,7 @@ tree or linear structure to read)."""
     ]
     engineered_text = " and ".join(engineered) if engineered else "neither one appears"
 
-    return f"""## 3. What the model uses
+    return f"""## 4. What the model uses
 
 SHAP values from the `{findings.explainer}` explainer, over {findings.shap_rows:,} day-2 transactions: every fraud, plus a sample of legitimate ones.
 Frauds are over-represented against the 0.17% base rate on purpose, so the ranking below
@@ -237,7 +358,7 @@ def _misses(findings: Findings) -> str:
 
     alerts = findings.kept_threshold["alerts_per_day"]
 
-    return f"""## 5. The confusion matrix, and what got through
+    return f"""## 6. The confusion matrix, and what got through
 
 At the shipped threshold ({findings.kept_threshold['threshold']:.6g}) on day 2 — where "alerted"
 means "queued for a human", not "declined":
@@ -265,7 +386,27 @@ in the thousands is a ranking failure that no threshold fixes.
 def _limitations(findings: Findings) -> str:
     frauds = findings.day_one[1] + findings.day_two[1]
 
-    return f"""## 6. Limitations
+    if findings.comparisons is None or findings.comparisons.empty:
+        ranking = ("The winner beat the runner-up by less than the fold-to-fold spread, so "
+                   f'"best model" here means "best on this split at seed {findings.seed}", '
+                   "not a general ranking.")
+    else:
+        runner_up = findings.comparisons.iloc[0]
+        ranking = (
+            f"The winner's {abs(float(runner_up['difference'])):.4f} PR-AUC lead over "
+            f"`{runner_up['label']}` "
+            + ("survives" if bool(runner_up["significant"]) else "does not survive")
+            + f" a corrected paired t-test (section 3, Holm-adjusted p={_p(runner_up['p_holm'])}), "
+              f'and either way "best model" here means "best on this split at seed '
+              f'{findings.seed}", not a general ranking.'
+        )
+    ranking = fill(
+        f"- **One seed, one dataset.** {ranking} The test in section 3 measures how far this "
+        f"split can be trusted; it cannot make the split representative.",
+        indent="  "
+    )
+
+    return f"""## 7. Limitations
 
 - **{frauds} frauds in total, {findings.day_one[1]} of them on the training side.** Every number
   here carries the variance that implies; the CV spread quoted above is not a rounding error,
@@ -280,9 +421,7 @@ def _limitations(findings: Findings) -> str:
   and a review at a flat {findings.review_cost:g}. Real recovery rates, chargeback fees, and the cost of
   a wrongly blocked customer are all missing, and the cost-optimal threshold moves with them —
   the sensitivity table in the run output shows how far.
-- **One seed, one dataset.** The winner beat the runner-up by less than the fold-to-fold
-  spread, so "best model" here means "best on this split at seed {findings.seed}", not a
-  general ranking.
+{ranking}
 - **No drift validation.** Nothing here can be checked against real fraud drift, novel attack
   patterns, or an adversary reacting to the model - which is the case for keeping an
   unsupervised detector in the comparison even though it loses on PR-AUC."""
@@ -314,6 +453,8 @@ Its tuned hyperparameters:
 {_metric_choice(findings)}
 
 {_validation(findings)}
+
+{_significance(findings)}
 
 {_interpretation(findings)}
 

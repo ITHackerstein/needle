@@ -1,11 +1,11 @@
 import pandas as pd
 from sklearn.metrics import average_precision_score, roc_auc_score
-from . import interpret, models as _models, plots
+from . import compare, interpret, models as _models, plots
 from .common import cross_validation_split, probability, ranking, recall_key, take
 from .config import OBJECTIVES, Settings
 from .data import load_data, temporal_split, extract_features
 from .models import CANDIDATE_PIPELINES
-from .evaluate import cross_validate_candidates, recall_at_precision
+from .evaluate import FOLD_COLUMN, cross_validate_candidates, recall_at_precision
 from .threshold import (
     apply_threshold,
     review_cost_sensitivity,
@@ -94,6 +94,31 @@ def _tuned_candidates(X, y, settings: Settings, revalidate: bool = False) -> lis
 
         candidates.append(tuned_candidate(result))
     return candidates
+
+def _significance(fold_scores: dict, leaderboard, settings: Settings):
+    if not settings.tests:
+        return None
+
+    say("\n=== is the leaderboard order real? (corrected paired t, day-1 folds) ===")
+    comparisons = compare.against_winner(
+        fold_scores, leaderboard["label"],
+        n_compare=settings.n_compare, alpha=settings.alpha
+    )
+    if comparisons.empty:
+        say("  only one candidate was scored, so there is nothing to compare")
+        return comparisons
+
+    say(comparisons.to_string(index=False))
+
+    tied = comparisons.loc[~comparisons["significant"], "label"].tolist()
+    say(f"\n  {len(comparisons) - len(tied)} of {len(comparisons)} separated from the winner "
+        f"at alpha={settings.alpha:g}, Holm-corrected across the family")
+    if tied:
+        say(f"  indistinguishable on these folds: {', '.join(tied)}")
+    # NOTE: reporting only, on purpose. Switching the selection rule to 'the cheapest candidate
+    # that survives the test' would change what ships, which is a separate decision.
+    say("  reporting only - the shipped model is still the top of the leaderboard")
+    return comparisons
 
 def _operating_point(candidate, X, y, amounts, settings: Settings) -> tuple[dict, "pd.Series"]:
     say("\n=== threshold selection (day 1, out-of-fold) ===")
@@ -243,11 +268,16 @@ def run(settings: Settings | None = None) -> None:
     leaderboard = pd.concat(rows, ignore_index=True).sort_values(
         "pr_auc_mean", ascending=False, ignore_index=True
     )
+    # NOTE: the fold vectors travel out of the leaderboard before it is printed or reported -
+    # they are what the paired test needs, and an ndarray column renders as noise everywhere else
+    fold_scores = dict(zip(leaderboard["label"], leaderboard[FOLD_COLUMN]))
+    leaderboard = leaderboard.drop(columns=[FOLD_COLUMN])
     say("")
     say(leaderboard.to_string())
 
     best = leaderboard.iloc[0]
     winner = by_label[best["label"]]
+    comparisons = _significance(fold_scores, leaderboard, settings)
     chosen, validation_scores = _operating_point(winner, X_first, y_first, amounts_first, settings)
 
     model, scores, probabilities, holdout = _holdout(
@@ -301,6 +331,9 @@ def run(settings: Settings | None = None) -> None:
         leaderboard=leaderboard,
         cv_pr_auc=float(best["pr_auc_mean"]),
         cv_pr_auc_std=float(best["pr_auc_std"]),
+        comparisons=comparisons,
+        n_folds=len(fold_scores[best["label"]]),
+        alpha=settings.alpha,
         holdout=holdout,
         chosen=chosen,
         kept_threshold=kept,

@@ -482,6 +482,7 @@ dependencies = [
     { name = "optuna" },
     { name = "pandas" },
     { name = "scikit-learn" },
+    { name = "scipy" },
     { name = "shap" },
 ]
 
@@ -494,6 +495,7 @@ requires-dist = [
     { name = "optuna", specifier = ">=4.9.0" },
     { name = "pandas", specifier = ">=3.0.5" },
     { name = "scikit-learn", specifier = ">=1.9.0" },
+    { name = "scipy", specifier = ">=1.18.0" },
     { name = "shap", specifier = ">=0.52.0" },
 ]
 

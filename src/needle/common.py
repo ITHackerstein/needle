@@ -3,6 +3,11 @@ from sklearn.model_selection import RepeatedStratifiedKFold
 
 SEED = 42
 
+# NOTE: named rather than left as defaults below because compare.py needs the fold count to
+# size its variance correction, and it has to be the same 5 the splitter actually used
+CV_SPLITS = 5
+CV_REPEATS = 3
+
 def recall_key(min_precision: float) -> str:
     # NOTE: the metric's name follows its threshold, so it has one spelling everywhere
     return f"recall_at_p{int(min_precision * 100)}"
@@ -24,5 +29,7 @@ def probability(model, X) -> np.ndarray | None:
     return model.predict_proba(X)[:, 1]
 
 
-def cross_validation_split(n_splits: int = 5, n_repeats: int = 3, seed: int = SEED) -> RepeatedStratifiedKFold:
+def cross_validation_split(
+    n_splits: int = CV_SPLITS, n_repeats: int = CV_REPEATS, seed: int = SEED
+) -> RepeatedStratifiedKFold:
     return RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=seed)

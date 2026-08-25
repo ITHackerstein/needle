@@ -6,6 +6,8 @@ from .models import CandidatePipeline, CANDIDATE_PIPELINES
 from .common import cross_validation_split, recall_key
 from .config import MIN_PRECISION
 
+FOLD_COLUMN = "pr_auc_folds"
+
 
 def recall_at_precision(y_true, y_score, min_precision: float = MIN_PRECISION) -> float:
     y_true, y_score = np.asarray(y_true), np.asarray(y_score)
@@ -57,6 +59,10 @@ def cross_validate_candidates(
             row[f"{metric}_mean"] = result[f"test_{metric}"].mean()
             row[f"{metric}_std"] = result[f"test_{metric}"].std()
         row["fit_seconds"] = result["fit_time"].mean()
+        # NOTE: the per-fold PR-AUCs survive, not just their mean and spread. Every candidate
+        # here is scored on the same cv object, so these vectors pair up fold for fold and are
+        # what compare.py runs its paired test on.
+        row[FOLD_COLUMN] = result["test_pr_auc"].copy()
 
         rows.append(row)
 

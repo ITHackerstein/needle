@@ -3,8 +3,8 @@ import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from .config import ALERT_BUDGET, DATA_PATH, MIN_PRECISION, OBJECTIVE, OBJECTIVES, REPORTS_DIR, \
-    REVIEW_COST, SHAP_FEATURES, SHAP_SAMPLE, Settings
+from .config import ALERT_BUDGET, ALPHA, DATA_PATH, MIN_PRECISION, N_COMPARE, OBJECTIVE, \
+    OBJECTIVES, REPORTS_DIR, REVIEW_COST, SHAP_FEATURES, SHAP_SAMPLE, Settings
 from .common import SEED
 from .tune import DEFAULT_TUNED
 
@@ -74,6 +74,13 @@ def parser() -> argparse.ArgumentParser:
                           f"(default: {SHAP_SAMPLE})")
     run.add_argument("--shap-features", type=int, default=SHAP_FEATURES, metavar="N",
                      help=f"features in the beeswarm and ranking table (default: {SHAP_FEATURES})")
+    run.add_argument("--alpha", type=float, default=ALPHA, metavar="A",
+                     help=f"significance level for the paired model comparison "
+                          f"(default: {ALPHA:g})")
+    run.add_argument("--compare", dest="n_compare", type=int, default=N_COMPARE, metavar="N",
+                     help=f"leaderboard rows to test the winner against (default: {N_COMPARE})")
+    run.add_argument("--no-tests", dest="tests", action="store_false",
+                     help="skip the paired comparison of the leaderboard's top candidates")
     run.add_argument("--no-plots", dest="plots", action="store_false", help="skip the figures")
     run.add_argument("--no-report", dest="report", action="store_false",
                      help="skip writing summary.md")
