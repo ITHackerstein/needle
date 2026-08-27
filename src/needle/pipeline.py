@@ -204,11 +204,15 @@ def _figures(settings: Settings, **parts) -> list:
         return []
 
     say("\n=== figures ===")
+    # NOTE: the marked point is the threshold that actually ships - the day-1 choice carried
+    # unchanged to day 2 - not the rate-matched one. Marking the rate-matched point would ring a
+    # queue length the run never decided on, and it would disagree with missed_frauds below,
+    # which draws parts["threshold"].
     figures = [
-        plots.precision_recall(parts["curves"], chosen=parts["achieved"],
+        plots.precision_recall(parts["curves"], chosen=parts["shipped"],
                                directory=settings.reports_dir),
         plots.cost_vs_alerts(parts["y"], parts["scores"], parts["amounts"],
-                             chosen=parts["achieved"], review_cost=settings.review_cost,
+                             chosen=parts["shipped"], review_cost=settings.review_cost,
                              directory=settings.reports_dir),
         plots.missed_frauds(parts["y"], parts["scores"], parts["amounts"], parts["threshold"],
                             directory=settings.reports_dir)
@@ -314,7 +318,7 @@ def run(settings: Settings | None = None) -> None:
         calibrated=calibrated_probabilities,
         amounts=amounts_second,
         threshold=kept["threshold"],
-        achieved=achieved,
+        shipped=kept,
         explanation=explanation
     )
 

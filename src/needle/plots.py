@@ -31,23 +31,33 @@ def _save(figure, name: str, directory=None) -> Path:
 def _mark(axis, x: float, y: float, text: str, fraction: float = 0.65) -> None:
     """Ring the point and label it, leaning the label back inside the axes.
 
-    `fraction` is where along the x range the label flips to the left; without it a
-    point near recall 1.0 - which is where a cost-optimal threshold lands - writes its
-    caption off the right edge of the figure.
+    `fraction` is how close to an edge the point has to be before the label flips away
+    from it. Both axes are judged, and independently: the shipped operating point sits
+    near recall 1.0 and near precision 0, so a label that only dodged the right edge
+    would still be written off the bottom of the figure.
     """
     axis.plot([x], [y], marker="o", markersize=9, markerfacecolor="none",
               markeredgewidth=2, color="crimson", zorder=5)
 
-    low, high = axis.get_xlim()
-    position = x
-    if axis.get_xscale() == "log":  # judge position as drawn, not as numbered
-        low, high, position = np.log10(low), np.log10(high), np.log10(x)
-    on_the_right = position > low + fraction * (high - low)
+    def near_far_edge(limits, scale: str, value: float) -> bool:
+        low, high = limits
+        # NOTE: a log axis is judged as drawn, not as numbered - but only when everything is
+        # positive, since a decision function reaches zero and log10 would hand back -inf.
+        if scale == "log" and min(low, high, value) > 0:
+            low, high, value = np.log10(low), np.log10(high), np.log10(value)
+        return value > low + fraction * (high - low)
+
+    on_the_right = near_far_edge(axis.get_xlim(), axis.get_xscale(), x)
+    # NOTE: the y test is inverted - a point is crowded when it is near the *bottom*, so the
+    # label goes up unless the point is high enough for there to be room beneath it.
+    near_the_bottom = not near_far_edge(axis.get_ylim(), axis.get_yscale(), y)
+
     axis.annotate(
         text, (x, y),
         textcoords="offset points",
-        xytext=(-12, -28) if on_the_right else (12, 10),
+        xytext=(-12 if on_the_right else 12, 12 if near_the_bottom else -12),
         horizontalalignment="right" if on_the_right else "left",
+        verticalalignment="bottom" if near_the_bottom else "top",
         fontsize=8, color="crimson", zorder=6
     )
 
