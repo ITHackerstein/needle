@@ -282,7 +282,7 @@ The full source code and instructions to reproduce the run are in the `needle` r
 - `min_child_samples` 145;
 - `subsample` 0.524 at `subsample_freq` 1;
 - `colsample_bytree` 0.829;
-- `reg_alpha` $1.5^(-4)$;
+- `reg_alpha` $1.5 times 10^(-4)$;
 - `reg_lambda` 2.30;
 - default SMOTE sampling ratio (1).
 
