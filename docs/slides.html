@@ -1,0 +1,1309 @@
+<!-- AI DISCLAIMER: this presentation was written with the assistance of
+     Claude (Anthropic), directed by the author. -->
+<title>Needle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+
+<style>
+:root{
+  --ground:#F6F8FA;
+  --surface:#FFFFFF;
+  --surface-2:#E5EAEF;
+  --ink:#101519;
+  --ink-2:#38434C;
+  --ink-3:#5C6872;
+  --rule:#C3CBD3;
+  --accent:#0F4C7A;
+  --accent-soft:#DCE7F1;
+  --good:#166B45;
+  --bad:#A1362A;
+  --plate:#FFFFFF;
+  --plate-edge:#C3CBD3;
+
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Newsreader",Georgia,"Times New Roman",serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--f-body);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+#viewport{position:fixed;inset:0;overflow:hidden}
+#stage{
+  position:absolute;top:50%;left:50%;
+  width:1280px;height:720px;
+  transform:translate(-50%,-50%);
+  transform-origin:center center;
+  background:var(--ground);
+}
+
+.slide{
+  position:absolute;inset:0;
+  padding:60px 84px 92px;
+  display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;
+  transition:opacity .22s ease;
+}
+.slide.is-active{opacity:1;visibility:visible}
+@media (prefers-reduced-motion:reduce){.slide{transition:none}}
+
+/* ---- shared type ---- */
+.eyebrow{
+  font-family:var(--f-mono);font-size:12px;font-weight:500;
+  letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);
+  display:flex;gap:14px;align-items:baseline;
+  margin-bottom:26px;flex:0 0 auto;
+}
+.eyebrow b{color:var(--accent);font-weight:600}
+h1{
+  font-family:var(--f-display);font-weight:700;
+  font-size:82px;line-height:.98;letter-spacing:-.03em;
+  margin:0;text-wrap:balance;
+}
+h2{
+  font-family:var(--f-display);font-weight:600;
+  font-size:42px;line-height:1.08;letter-spacing:-.02em;
+  margin:0 0 8px;max-width:22ch;text-wrap:balance;
+}
+h2.wide{max-width:32ch}
+h2.full{max-width:none}
+.lead{
+  font-size:23px;line-height:1.45;color:var(--ink-2);
+  max-width:60ch;margin:10px 0 0;
+}
+.slide p{font-size:20px;line-height:1.5;margin:0 0 14px;max-width:62ch}
+.slide p:last-child{margin-bottom:0}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:500}
+.hl{color:var(--accent);font-weight:500}
+.good{color:var(--good)}
+.bad{color:var(--bad)}
+code{font-family:var(--f-mono);font-size:.88em;background:var(--surface-2);padding:1px 5px;border-radius:2px}
+
+.body-area{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:center}
+.body-area.top{justify-content:flex-start}
+
+/* ---- title slide ---- */
+.title-slide{padding:0;display:grid;grid-template-columns:1fr 400px}
+.title-left{padding:74px 0 74px 84px;display:flex;flex-direction:column;justify-content:space-between}
+.title-right{position:relative;overflow:hidden;border-left:1px solid var(--rule)}
+.haystack{position:absolute;inset:0;display:grid;grid-template-columns:repeat(23,1fr);align-content:center;gap:3px;padding:26px}
+.haystack i{display:block;aspect-ratio:1;border-radius:50%;background:var(--rule)}
+.haystack i.pos{background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.byline{font-family:var(--f-mono);font-size:13px;letter-spacing:.04em;color:var(--ink-2);line-height:1.9}
+.byline span{color:var(--ink-3)}
+
+/* ---- big stat ---- */
+.stat-row{display:flex;align-items:flex-end;gap:36px;margin:0 0 4px}
+.stat-big{
+  font-family:var(--f-mono);font-weight:600;font-size:132px;
+  line-height:.86;letter-spacing:-.05em;color:var(--accent);
+  font-variant-numeric:tabular-nums;
+}
+.stat-side{padding-bottom:12px;border-left:1px solid var(--rule);padding-left:28px}
+.stat-side div{font-family:var(--f-mono);font-size:15px;color:var(--ink-2);line-height:2}
+
+/* ---- columns ---- */
+.cols{display:grid;gap:40px}
+.cols.two{grid-template-columns:1fr 1fr}
+.cols.three{grid-template-columns:repeat(3,1fr)}
+.cols.four{grid-template-columns:repeat(4,1fr);gap:32px}
+.cols.five{grid-template-columns:repeat(5,1fr);gap:24px}
+.cols.five .card h3{font-size:17.5px}
+.cols.five .card p{font-size:15px;line-height:1.45}
+.cols.five .card .k{font-size:11px;letter-spacing:.11em}
+.cols.four .card h3{font-size:19px}
+.cols.four .card p{font-size:16px;line-height:1.45}
+.cols.fig{grid-template-columns:1.32fr 1fr;align-items:center}
+.card{border-top:2px solid var(--accent);padding-top:16px}
+.card h3{
+  font-family:var(--f-display);font-weight:600;font-size:21px;
+  letter-spacing:-.01em;margin:0 0 8px;line-height:1.2;
+}
+.card p{font-size:17px;line-height:1.48;color:var(--ink-2);margin:0}
+.card .k{font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);display:block;margin-bottom:9px}
+
+/* ---- plate for matplotlib figures (always light: the PNGs are white-ground) ---- */
+.plate{
+  background:var(--plate);
+  border:1px solid var(--plate-edge);
+  border-radius:3px;padding:10px;
+  display:flex;align-items:center;justify-content:center;
+}
+.plate img{display:block;max-width:100%;max-height:100%;object-fit:contain}
+.plate.tall{height:472px}
+.plate.wide{height:430px}
+.caption{font-size:16px;line-height:1.45;color:var(--ink-2);margin:14px 0 0;max-width:46ch}
+
+/* ---- tables ---- */
+.dchart{display:flex;flex-direction:column;margin-top:6px}
+.drow{
+  display:grid;grid-template-columns:150px 1fr 62px 44px 62px;
+  align-items:center;gap:0 14px;height:40px;
+}
+.dname{font-family:var(--f-mono);font-size:12.5px;color:var(--ink-2);text-align:right;white-space:nowrap}
+.dtrack{position:relative;height:100%}
+.dband{
+  position:absolute;left:0;top:50%;transform:translateY(-50%);
+  height:27px;background:#CFDDEA;border-radius:0 2px 2px 0;
+}
+.dtrack b{
+  position:absolute;left:0;top:50%;transform:translateY(-50%);
+  height:17px;background:#1A5F92;border-radius:0 3px 3px 0;
+}
+.dlegend{
+  display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 14px;
+  font-family:var(--f-body);font-size:15.5px;color:var(--ink-2);
+}
+.sw{display:inline-block;width:22px;height:11px;border-radius:2px;margin-left:14px}
+.dlegend .sw:first-child{margin-left:0}
+.sw-band{background:#CFDDEA}
+.sw-bar{background:#1A5F92}
+.dval,.dt,.dp{
+  font-family:var(--f-mono);font-size:12.5px;text-align:right;
+  font-variant-numeric:tabular-nums;
+}
+.dval{color:var(--ink);font-weight:500}
+.dt,.dp{color:var(--ink-3)}
+.drow.dhead{height:26px;align-items:end}
+.drow.dhead .dval,.drow.dhead .dt,.drow.dhead .dp{
+  font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:600;padding-bottom:2px;
+}
+.drow.dhead .dtrack{background:none}
+.drow.daxis{height:24px}
+.drow.daxis .dtrack{background:none;border-top:1px solid var(--rule)}
+.drow.daxis i{
+  position:absolute;top:4px;transform:translateX(-50%);
+  font-family:var(--f-mono);font-style:normal;font-size:10px;color:var(--ink-3);
+}
+.mini{display:flex;flex-direction:column;gap:0}
+.mhead{
+  font-family:var(--f-mono);font-size:10.5px;font-weight:600;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:14px;
+}
+.mrow{display:grid;grid-template-columns:118px 1fr 46px;align-items:center;gap:0 12px;height:34px}
+.mname{font-family:var(--f-mono);font-size:12px;color:var(--ink-2);text-align:right;white-space:nowrap}
+.mtrack{
+  position:relative;height:100%;
+  background:linear-gradient(to right, var(--rule) 0 1px, transparent 1px) 50% 0/50% 100% repeat-x;
+}
+.mtrack b{
+  position:absolute;left:0;top:50%;transform:translateY(-50%);
+  height:15px;background:#1A5F92;border-radius:0 3px 3px 0;
+}
+.mval{
+  font-family:var(--f-mono);font-size:12.5px;color:var(--ink);text-align:right;
+  font-variant-numeric:tabular-nums;
+}
+.mrow.maxis{height:22px}
+.mrow.maxis .mtrack{background:none;border-top:1px solid var(--rule)}
+.mrow.maxis i{
+  position:absolute;top:3px;font-family:var(--f-mono);font-style:normal;
+  font-size:10px;color:var(--ink-3);
+}
+.mrow.maxis i:nth-child(1){left:0}
+.mrow.maxis i:nth-child(2){left:50%;transform:translateX(-50%)}
+.mrow.maxis i:nth-child(3){right:0}
+.sm{
+  display:grid;grid-template-columns:214px repeat(3,1fr);
+  gap:0 22px;grid-auto-rows:25px;align-items:center;
+}
+.pt{
+  font-family:var(--f-mono);font-size:10.5px;font-weight:600;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--ink-3);align-self:end;padding-bottom:3px;
+  border-bottom:1px solid var(--rule);white-space:nowrap;overflow:hidden;
+}
+.sname{
+  font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2);text-align:right;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sname.win{color:var(--accent);font-weight:600}
+.st{
+  position:relative;height:100%;
+  background:linear-gradient(to right, var(--rule) 0 1px, transparent 1px) 50% 0/50% 100% repeat-x;
+}
+.st b{
+  position:absolute;left:0;top:50%;transform:translateY(-50%);
+  height:10px;background:#1A5F92;border-radius:0 3px 3px 0;
+}
+.st em{
+  position:absolute;right:0;top:50%;transform:translateY(-50%);
+  font-family:var(--f-mono);font-style:normal;font-size:11px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;background:var(--ground);padding-left:4px;
+}
+.sax{position:relative;height:100%;border-top:1px solid var(--rule)}
+.sax i{
+  position:absolute;top:3px;font-family:var(--f-mono);font-style:normal;
+  font-size:10px;color:var(--ink-3);
+}
+.sax i:nth-child(1){left:0}
+.sax i:nth-child(2){left:50%;transform:translateX(-50%)}
+.sax i:nth-child(3){right:0}
+.hbars{display:flex;flex-direction:column}
+.hrow{
+  display:grid;grid-template-columns:206px 1fr 52px 64px;
+  align-items:center;gap:0 14px;height:23px;
+}
+.hname{
+  font-family:var(--f-mono);font-size:11px;color:var(--ink-2);
+  text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.htrack{
+  position:relative;height:100%;
+  background:repeating-linear-gradient(to right,
+    transparent 0 calc(25% - 1px), var(--rule) calc(25% - 1px), var(--rule) 25%);
+}
+.hbar{
+  position:absolute;left:0;top:50%;transform:translateY(-50%);
+  height:10px;background:#1A5F92;border-radius:0 3px 3px 0;
+}
+.wl,.wr{position:absolute;top:50%;transform:translateY(-50%);height:7px}
+.wl{background:linear-gradient(var(--surface),var(--surface)) center/100% 1px no-repeat}
+.wr{background:linear-gradient(var(--ink-2),var(--ink-2)) center/100% 1px no-repeat}
+.wl::before,.wr::after{content:"";position:absolute;top:0;width:1px;height:7px}
+.wl::before{left:0;background:var(--surface)}
+.wr::after{right:0;background:var(--ink-2)}
+.hval{
+  font-family:var(--f-mono);font-size:12px;font-weight:500;color:var(--ink);
+  text-align:right;font-variant-numeric:tabular-nums;
+}
+.hsd,.hrp,.hroc{
+  font-family:var(--f-mono);font-size:12px;
+  text-align:right;font-variant-numeric:tabular-nums;
+}
+.hsd{color:var(--ink-3)}
+.hrp{color:var(--ink-2)}
+.hroc{color:var(--ink-3)}
+.hrow.ship .hname,.hrow.ship .hval{color:var(--accent);font-weight:600}
+.hrow.hhead{height:20px}
+.hrow.hhead .hval,.hrow.hhead .hsd,.hrow.hhead .hrp,.hrow.hhead .hroc{
+  font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:600;
+}
+.hrow.hhead .htrack{background:none}
+.hrow.haxis{height:22px}
+.hrow.haxis .htrack{background:none;border-top:1px solid var(--rule)}
+.hrow.haxis i{
+  position:absolute;top:4px;font-family:var(--f-mono);font-style:normal;
+  font-size:10px;color:var(--ink-3);transform:translateX(-50%);
+}
+.hrow.haxis i:nth-child(1){left:0;transform:none}
+.hrow.haxis i:nth-child(2){left:25%}
+.hrow.haxis i:nth-child(3){left:50%}
+.hrow.haxis i:nth-child(4){left:75%}
+.hrow.haxis i:nth-child(5){left:100%;transform:translateX(-100%)}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+th,td{padding:6px 12px;text-align:right;font-size:15.5px;border-bottom:1px solid var(--rule)}
+th:first-child,td:first-child{text-align:left;padding-left:0}
+td:last-child,th:last-child{padding-right:0}
+thead th{
+  font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+  font-weight:600;color:var(--ink-3);border-bottom:1px solid var(--ink-3);
+}
+tbody tr.win td{color:var(--accent);font-weight:600}
+tbody tr.dim td{color:var(--ink-3)}
+tbody tr.ship td{background:var(--accent-soft)}
+table.compact th,table.compact td{padding:4.5px 12px;font-size:14.5px}
+.tbl-note{font-family:var(--f-mono);font-size:12.5px;color:var(--ink-3);margin:14px 0 0;line-height:1.65;letter-spacing:.01em}
+
+/* ---- misc blocks ---- */
+.card ul{list-style:none;margin:9px 0 0;padding:0}
+.card li{
+  font-size:16px;line-height:1.4;color:var(--ink-2);
+  padding-left:15px;position:relative;margin-bottom:6px;
+}
+.card li:last-child{margin-bottom:0}
+.card li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:1px;background:var(--accent)}
+.m{font-style:italic;font-size:1.05em;white-space:nowrap}
+.m sub{font-size:.7em;font-style:italic}
+.equation{
+  font-family:var(--f-body);font-size:27px;line-height:1.7;
+  background:var(--surface);border:1px solid var(--rule);
+  border-left:3px solid var(--accent);
+  padding:24px 28px;border-radius:2px;margin:6px 0 0;
+}
+.equation i{font-style:italic}
+.equation sub{font-size:.6em;font-style:italic;letter-spacing:.01em}
+.equation .sum{font-size:1.24em;line-height:0}
+.equation .cont{display:block;padding-left:3.4em}
+.terms{
+  font-family:var(--f-body);font-size:17.5px;line-height:1.55;
+  color:var(--ink-2);margin:18px 0 0;max-width:44ch;
+}
+.terms i{font-style:italic}
+.terms sub{font-size:.72em;font-style:italic}
+ul.ticks{list-style:none;margin:6px 0 0;padding:0}
+ul.ticks li{
+  font-size:19px;line-height:1.45;color:var(--ink-2);
+  padding-left:26px;position:relative;margin-bottom:13px;max-width:56ch;
+}
+ul.ticks li:last-child{margin-bottom:0}
+.ticks.compact li{font-size:17.5px;margin-bottom:11px;max-width:none}
+ul.ticks li::before{
+  content:"";position:absolute;left:0;top:.6em;
+  width:11px;height:1px;background:var(--accent);
+}
+ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
+.kicker{
+  font-family:var(--f-display);font-weight:600;font-size:26px;
+  line-height:1.28;letter-spacing:-.015em;color:var(--ink);
+  border-left:3px solid var(--accent);padding-left:22px;margin:0;max-width:34ch;
+}
+.kicker.bare{border-left:0;padding-left:0;color:var(--accent)}
+.ledger{
+  display:flex;gap:0;margin:0 0 6px;
+  border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
+}
+.ledger > div{flex:1;padding:15px 22px;border-right:1px solid var(--rule)}
+.ledger > div:first-child{padding-left:0}
+.ledger > div:last-child{border-right:0;padding-right:0}
+.ledger .v{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:34px;font-weight:600;letter-spacing:-.03em;line-height:1}
+.ledger .l{font-family:var(--f-mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);margin-bottom:10px;line-height:1.5}
+
+.thanks{align-items:center;justify-content:center;text-align:center}
+.thanks-link{
+  font-family:var(--f-mono);font-size:16px;letter-spacing:.03em;
+  color:var(--ink-2);margin:30px 0 0;
+}
+
+/* ---- part divider ---- */
+.part-slide{justify-content:center;padding-left:84px}
+.part-no{
+  font-family:var(--f-mono);font-size:15px;font-weight:600;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:20px;
+}
+.part-slide h2{font-size:54px;max-width:26ch}
+
+/* ---- chrome ---- */
+#chrome{
+  position:absolute;z-index:6;left:84px;right:84px;bottom:34px;
+  display:flex;align-items:center;gap:22px;
+  font-family:var(--f-mono);font-size:11.5px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink-3);
+}
+#rail{display:flex;gap:5px;flex:1 1 auto}
+#rail button{
+  flex:1;height:3px;padding:0;border:0;border-radius:2px;
+  background:var(--rule);cursor:pointer;
+  transition:background .18s ease;
+}
+#rail button.seen{background:var(--ink-3)}
+#rail button.here{background:var(--accent)}
+#rail button:focus-visible,.nav:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+#counter{color:var(--ink-2);font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+.nav{
+  position:absolute;top:0;bottom:0;width:16%;border:0;background:transparent;
+  cursor:pointer;z-index:5;
+}
+.nav.prev{left:0}
+.nav.next{right:0}
+#hint{
+  position:absolute;bottom:34px;right:84px;
+  font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);opacity:1;
+  transition:opacity .6s ease;pointer-events:none;
+}
+#hint.gone{opacity:0}
+#stage[data-at="0"] #chrome{opacity:0;pointer-events:none}
+#chrome{transition:opacity .22s ease}
+
+@media print{
+  body,#viewport{overflow:visible!important;position:static!important;background:var(--ground)}
+  #stage{
+    position:static!important;transform:none!important;
+    width:1280px;height:auto;
+  }
+  .slide{
+    position:static;opacity:1;visibility:visible;transition:none;
+    height:720px;page-break-after:always;break-after:page;
+  }
+  .slide:last-of-type{page-break-after:auto;break-after:auto}
+  .nav,#hint,#chrome{display:none}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @page{size:13.333in 7.5in;margin:0}
+}
+</style>
+
+<div id="viewport">
+  <div id="stage">
+
+<!-- 1 =========================================================== -->
+<section class="slide title-slide" data-label="Title">
+  <div class="title-left">
+    <div>
+      <div class="eyebrow" style="margin-bottom:34px"><span>Università degli Studi di Bari Aldo Moro</span></div>
+      <h1>needle</h1>
+      <p class="lead" style="font-size:26px;max-width:24ch;margin-top:20px">
+        Cost-aware credit card fraud detection under extreme class imbalance
+      </p>
+    </div>
+    <div class="byline">
+      Davide Carella<br>
+      <span>d.carella12@studenti.uniba.it</span>
+    </div>
+  </div>
+  <div class="title-right">
+    <div class="haystack" aria-hidden="true"></div>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 2 =========================================================== -->
+<section class="slide part-slide" data-label="Section I · Introduction">
+  <div class="part-no">Section I</div>
+  <h2>Introduction</h2>
+</section>
+
+
+
+
+
+
+
+
+<!-- 3 =========================================================== -->
+<section class="slide" data-label="0.17%">
+  <div class="eyebrow"><b>I</b><span>Introduction</span></div>
+  <div class="body-area">
+    <div class="stat-row">
+      <div class="stat-big">0.17%</div>
+      <div class="stat-side">
+        <div>284,807 transactions</div>
+        <div>492 frauds</div>
+        <div>two days, one European issuer</div>
+      </div>
+    </div>
+    <p class="kicker bare" style="margin-top:40px">
+      A model that never predicts fraud is 99.83% accurate, and worth nothing.
+    </p>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 4 =========================================================== -->
+<section class="slide" data-label="ROC-AUC is the wrong instrument">
+  <div class="eyebrow"><b>I</b><span>Introduction</span></div>
+  <div class="body-area">
+    <h2 class="wide">ROC-AUC is nearly as uninformative as accuracy</h2>
+    <p class="lead" style="margin-top:24px">
+      Its abscissa divides false alarms by all 284,315 negatives. At 578 negatives for every
+      positive, the entire span between a model
+      an analyst can use and one that buries them fits inside the leftmost few percent of the
+      curve.
+    </p>
+    <p class="kicker bare" style="margin-top:38px">Reported for comparability. Never used to choose.</p>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 5 =========================================================== -->
+<section class="slide part-slide" data-label="Section II · Related work">
+  <div class="part-no">Section II</div>
+  <h2>Related work</h2>
+</section>
+
+
+
+
+
+
+
+<!-- 6 =========================================================== -->
+<section class="slide" data-label="The dataset and its authors">
+  <div class="eyebrow"><b>II-A</b><span>The dataset and its authors</span></div>
+  <h2>Where the data comes from</h2>
+  <div class="body-area top" style="margin-top:22px">
+    <div class="cols four">
+      <div class="card">
+        <span class="k">Provenance</span>
+        <h3>Worldline and the Machine Learning Group at ULB</h3>
+        <p>The extract is a by-product of an industrial research collaboration rather than a benchmark built to be topped.</p>
+      </div>
+      <div class="card">
+        <span class="k">The framing we borrow</span>
+        <h3>Fraud detection is alert generation</h3>
+        <p>The group treats the task as filling a bounded review queue, not as labelling every transaction. That is the framing this project adopts wholesale.</p>
+      </div>
+      <div class="card">
+        <span class="k">Why we calibrate at all</span>
+        <h3>Undersampling shifts the posterior</h3>
+        <p>Shown analytically by the same group, which is the reason calibration is a stage of this pipeline rather than an afterthought.</p>
+      </div>
+      <div class="card">
+        <span class="k">Out of reach here</span>
+        <h3>Two frozen days express none of it</h3>
+        <p>The same line of work goes on to add verification latency and concept drift, streaming at scale, active learning under a labelling budget, domain adaptation and incremental retraining. A static extract carries none of it, so none of it is tested here.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+
+
+<!-- 7 =========================================================== -->
+<section class="slide" data-label="What the literature settles">
+  <div class="eyebrow"><b>II-B, II-C, II-D</b><span>Evaluation, resampling, leakage</span></div>
+  <h2 class="full">What the literature already settles</h2>
+  <div class="body-area top" style="margin-top:22px">
+    <div class="cols three">
+      <div class="card">
+        <span class="k">II-B · Evaluation</span>
+        <h3>ROC and PR space weight the same errors differently</h3>
+        <p>Established for classification in general, then argued directly for skewed data. The decision-theoretic basis for taking a threshold from costs rather than from a metric is older still.</p>
+      </div>
+      <div class="card">
+        <span class="k">II-C · Resampling</span>
+        <h3>SMOTE is expected to lose to class weighting</h3>
+        <p>Its benefit largely vanishes in high dimensions where the minority class is not locally dense, and it rarely beats weighting for strong ensembles once the threshold is tuned.</p>
+      </div>
+      <div class="card">
+        <span class="k">II-D · Leakage</span>
+        <h3>Four failures recur in work on this dataset</h3>
+        <ul>
+          <li>preprocessing applied before the split</li>
+          <li>reporting too vague to reproduce</li>
+          <li>no temporal validation at all</li>
+          <li>recall bought at precision's expense</li>
+        </ul>
+        <p style="margin-top:11px">Found by a 2025 audit of published methodology on this dataset.</p>
+      </div>
+    </div>
+    <p class="kicker bare" style="margin-top:30px;max-width:76ch;font-size:23px">
+      Every element of the protocol that follows answers one of those four, and it was fixed
+      before any model was compared.
+    </p>
+  </div>
+</section>
+
+
+
+
+
+
+
+<!-- 8 =========================================================== -->
+<section class="slide part-slide" data-label="Section III · Methodology">
+  <div class="part-no">Section III</div>
+  <h2>Methodology</h2>
+</section>
+
+
+
+
+
+
+
+
+<!-- 9 =========================================================== -->
+<section class="slide" data-label="What we optimise instead">
+  <div class="eyebrow"><b>III-B</b><span>The metrics used</span></div>
+  <h2>What we optimise instead</h2>
+  <div class="cols two body-area" style="margin-top:26px">
+    <div>
+      <ul class="ticks">
+        <li><b>PR-AUC</b> is the primary metric, because it answers to the minority class and so moves when the model does.</li>
+        <li><b>Recall at precision ≥ 0.90</b> reports what a review team actually experiences at a tolerable rate of false alarms.</li>
+        <li><b>An amount-weighted cost</b> decides between the survivors, pricing every missed fraud at its own amount and every false alarm at one review.</li>
+      </ul>
+    </div>
+    <div>
+      <div class="equation">
+        cost(<i>t</i>) &nbsp;=&nbsp; <span class="sum">&sum;</span><sub>&thinsp;missed frauds</sub> <i>a<sub>i</sub></i>
+        <span class="cont">+&nbsp; <i>c</i><sub>review</sub> &middot; |false alarms|</span>
+      </div>
+      <p class="terms">
+        Here <i>a<sub>i</sub></i> is the amount of the transaction and <i>c</i><sub>review</sub> = 3
+        is the price of one analyst review. Because that price is an assumption rather than a
+        measurement, every run re-solves the optimum over 1, 3, 5, 10, 30 and 100.
+      </p>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 10 ========================================================== -->
+<section class="slide" data-label="Leakage and the split">
+  <div class="eyebrow"><b>III-C</b><span>Data split</span></div>
+  <h2>Leakage guards</h2>
+  <div class="body-area top" style="margin-top:22px">
+    <div class="cols four">
+      <div class="card">
+        <span class="k">Before the split</span>
+        <h3>1,081 duplicate rows removed</h3>
+        <p>19 of them frauds. An identical row landing on both sides of a split is leakage that no later care undoes.</p>
+      </div>
+      <div class="card">
+        <span class="k">The split</span>
+        <h3>Temporal, not random</h3>
+        <p>Day 1 (144,236 rows, 272 frauds) for the search, the model selection and the threshold.<br>Day 2 (139,490 rows, 201 frauds) for one final evaluation, and nothing else.</p>
+      </div>
+      <div class="card">
+        <span class="k">Inside the folds</span>
+        <h3>Scaling and resampling refitted per fold</h3>
+        <p>Every candidate is an <code>imblearn.Pipeline</code>, so nothing is ever fitted on the fold being scored.</p>
+      </div>
+      <div class="card">
+        <span class="k">The splits inside day 1</span>
+        <h3>Five folds to search, fifteen to select</h3>
+        <p>The hyperparameter search uses a stratified 5-fold, model selection a repeated stratified 5-fold with three repeats for fifteen folds in all, and the threshold is chosen from the out-of-fold scores alone.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 11 ========================================================== -->
+<section class="slide" data-label="Features">
+  <div class="eyebrow"><b>III-A</b><span>Data and features</span></div>
+  <h2>Three feature decisions</h2>
+  <div class="body-area top" style="margin-top:26px">
+    <ul class="ticks" style="font-size:20px">
+      <li><b><code>V1</code>–<code>V28</code></b> are left untouched, because they already come out of a PCA and are therefore scaled and uncorrelated.</li>
+      <li><b><code>Amount</code></b> becomes <span class="m">log_amount = log(1 + Amount)</span> and then passes through a RobustScaler, since the tail is heavy and the outliers are the rows we care about.</li>
+      <li><b><code>Time</code></b> becomes <span class="m">hour = (Time / 3600) mod 24</span>, because a raw second offset across two days is an index rather than a signal.</li>
+    </ul>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 12 ========================================================== -->
+<section class="slide" data-label="The candidate grid">
+  <div class="eyebrow"><b>III-D</b><span>Models, imbalance and tuning</span></div>
+  <h2>Seventeen candidates</h2>
+  <div class="cols two body-area" style="margin-top:24px">
+    <div>
+      <ul class="ticks">
+        <li><b>Four learners:</b> stratified dummy, logistic regression, random forest and LightGBM, each of them a scikit-learn estimator wrapped in an imbalanced-learn pipeline.</li>
+        <li><b>Three imbalance strategies:</b> class weighting, random undersampling and SMOTE.</li>
+        <li><b>Two unsupervised detectors:</b> an isolation forest and a denoising autoencoder trained on legitimate rows only, to ask whether labels are needed at all.</li>
+      </ul>
+    </div>
+    <div>
+      <p style="font-size:19px">
+        An Optuna search with a TPE sampler maximises PR-AUC over five folds, on a budget of
+        60 trials for LightGBM, which has the most to tune, and 15 to 20 for the others.
+      </p>
+      <p style="font-size:19px">
+        Every tuned winner is then re-scored on the full fifteen folds before it enters the
+        leaderboard, to pay back the selection bias of having been chosen.
+      </p>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 13 ========================================================== -->
+<section class="slide part-slide" data-label="Section IV · Results">
+  <div class="part-no">Section IV</div>
+  <h2>Results</h2>
+</section>
+
+
+
+
+
+
+
+
+<!-- 14 ========================================================== -->
+<section class="slide" data-label="The leaderboard" style="padding:44px 84px 74px">
+  <div class="eyebrow" style="margin-bottom:12px"><b>IV-A</b><span>The leaderboard</span></div>
+  <h2 class="full" style="font-size:30px;margin-bottom:20px">All seventeen candidates, ranked by PR-AUC</h2>
+  <div class="sm">
+      <span></span><span class="pt">PR-AUC</span><span class="pt">Recall at precision ≥ .90</span><span class="pt">ROC-AUC</span>
+      <span class="sname win">lgbm/smote (tuned)</span>
+      <span class="st"><b style="width:87.83%"></b><span class="wl" style="left:84.36%;width:3.47%"></span><span class="wr" style="left:87.83%;width:3.47%"></span><em>.8783</em></span>
+      <span class="st"><b style="width:85.93%"></b><em>.8593</em></span>
+      <span class="st"><b style="width:97.54%"></b><em>.9754</em></span>
+      <span class="sname">rf/smote (tuned)</span>
+      <span class="st"><b style="width:87.47%"></b><span class="wl" style="left:84.26%;width:3.21%"></span><span class="wr" style="left:87.47%;width:3.21%"></span><em>.8747</em></span>
+      <span class="st"><b style="width:85.55%"></b><em>.8555</em></span>
+      <span class="st"><b style="width:97.77%"></b><em>.9777</em></span>
+      <span class="sname">rf/smote</span>
+      <span class="st"><b style="width:86.97%"></b><span class="wl" style="left:83.71%;width:3.26%"></span><span class="wr" style="left:86.97%;width:3.26%"></span><em>.8697</em></span>
+      <span class="st"><b style="width:83.97%"></b><em>.8397</em></span>
+      <span class="st"><b style="width:97.31%"></b><em>.9731</em></span>
+      <span class="sname">rf/weighted</span>
+      <span class="st"><b style="width:86.18%"></b><span class="wl" style="left:82.67%;width:3.51%"></span><span class="wr" style="left:86.18%;width:3.51%"></span><em>.8618</em></span>
+      <span class="st"><b style="width:84.70%"></b><em>.8470</em></span>
+      <span class="st"><b style="width:95.51%"></b><em>.9551</em></span>
+      <span class="sname">lgbm/smote</span>
+      <span class="st"><b style="width:82.36%"></b><span class="wl" style="left:76.92%;width:5.44%"></span><span class="wr" style="left:82.36%;width:5.44%"></span><em>.8236</em></span>
+      <span class="st"><b style="width:82.62%"></b><em>.8262</em></span>
+      <span class="st"><b style="width:96.33%"></b><em>.9633</em></span>
+      <span class="sname">lr/none (tuned)</span>
+      <span class="st"><b style="width:73.55%"></b><span class="wl" style="left:67.96%;width:5.59%"></span><span class="wr" style="left:73.55%;width:5.59%"></span><em>.7355</em></span>
+      <span class="st"><b style="width:36.82%"></b><em>.3682</em></span>
+      <span class="st"><b style="width:95.43%"></b><em>.9543</em></span>
+      <span class="sname">rf/under</span>
+      <span class="st"><b style="width:71.39%"></b><span class="wl" style="left:65.55%;width:5.84%"></span><span class="wr" style="left:71.39%;width:5.84%"></span><em>.7139</em></span>
+      <span class="st"><b style="width:24.97%"></b><em>.2497</em></span>
+      <span class="st"><b style="width:97.14%"></b><em>.9714</em></span>
+      <span class="sname">lr/smote</span>
+      <span class="st"><b style="width:70.31%"></b><span class="wl" style="left:64.96%;width:5.35%"></span><span class="wr" style="left:70.31%;width:5.35%"></span><em>.7031</em></span>
+      <span class="st"><b style="width:19.31%"></b><em>.1931</em></span>
+      <span class="st"><b style="width:96.80%"></b><em>.9680</em></span>
+      <span class="sname">lr/weighted</span>
+      <span class="st"><b style="width:69.43%"></b><span class="wl" style="left:63.85%;width:5.58%"></span><span class="wr" style="left:69.43%;width:5.58%"></span><em>.6943</em></span>
+      <span class="st"><b style="width:17.83%"></b><em>.1783</em></span>
+      <span class="st"><b style="width:96.75%"></b><em>.9675</em></span>
+      <span class="sname">lgbm/under</span>
+      <span class="st"><b style="width:66.96%"></b><span class="wl" style="left:59.66%;width:7.30%"></span><span class="wr" style="left:66.96%;width:7.30%"></span><em>.6696</em></span>
+      <span class="st"><b style="width:17.31%"></b><em>.1731</em></span>
+      <span class="st"><b style="width:97.16%"></b><em>.9716</em></span>
+      <span class="sname">lgbm/weighted</span>
+      <span class="st"><b style="width:66.60%"></b><span class="wl" style="left:59.59%;width:7.01%"></span><span class="wr" style="left:66.60%;width:7.01%"></span><em>.6660</em></span>
+      <span class="st"><b style="width:34.07%"></b><em>.3407</em></span>
+      <span class="st"><b style="width:92.11%"></b><em>.9211</em></span>
+      <span class="sname">autoencoder/none</span>
+      <span class="st"><b style="width:52.98%"></b><span class="wl" style="left:43.37%;width:9.61%"></span><span class="wr" style="left:52.98%;width:9.61%"></span><em>.5298</em></span>
+      <span class="st"><b style="width:16.94%"></b><em>.1694</em></span>
+      <span class="st"><b style="width:94.12%"></b><em>.9412</em></span>
+      <span class="sname">lr/under</span>
+      <span class="st"><b style="width:52.24%"></b><span class="wl" style="left:38.52%;width:13.72%"></span><span class="wr" style="left:52.24%;width:13.72%"></span><em>.5224</em></span>
+      <span class="st"><b style="width:8.33%"></b><em>.0833</em></span>
+      <span class="st"><b style="width:96.61%"></b><em>.9661</em></span>
+      <span class="sname">autoencoder/none (tuned)</span>
+      <span class="st"><b style="width:51.29%"></b><span class="wl" style="left:39.05%;width:12.24%"></span><span class="wr" style="left:51.29%;width:12.24%"></span><em>.5129</em></span>
+      <span class="st"><b style="width:11.66%"></b><em>.1166</em></span>
+      <span class="st"><b style="width:94.40%"></b><em>.9440</em></span>
+      <span class="sname">isolation_forest/none (tuned)</span>
+      <span class="st"><b style="width:42.37%"></b><span class="wl" style="left:35.84%;width:6.53%"></span><span class="wr" style="left:42.37%;width:6.53%"></span><em>.4237</em></span>
+      <span class="st"><b style="width:7.98%"></b><em>.0798</em></span>
+      <span class="st"><b style="width:95.12%"></b><em>.9512</em></span>
+      <span class="sname">isolation_forest/none</span>
+      <span class="st"><b style="width:23.06%"></b><span class="wl" style="left:16.98%;width:6.08%"></span><span class="wr" style="left:23.06%;width:6.08%"></span><em>.2306</em></span>
+      <span class="st"><b style="width:0.00%"></b><em>.0000</em></span>
+      <span class="st"><b style="width:94.53%"></b><em>.9453</em></span>
+      <span class="sname">dummy/none</span>
+      <span class="st"><b style="width:0.19%"></b><span class="wl" style="left:0.18%;width:0.01%"></span><span class="wr" style="left:0.19%;width:0.01%"></span><em>.0019</em></span>
+      <span class="st"><b style="width:0.00%"></b><em>.0000</em></span>
+      <span class="st"><b style="width:49.97%"></b><em>.4997</em></span>
+      <span></span><span class="sax"><i>0</i><i>.5</i><i>1</i></span><span class="sax"><i>0</i><i>.5</i><i>1</i></span><span class="sax"><i>0</i><i>.5</i><i>1</i></span>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 15 ========================================================== -->
+<section class="slide" data-label="Three readings">
+  <div class="eyebrow"><b>IV-A</b><span>The leaderboard</span></div>
+  <h2>What the leaderboard says</h2>
+  <div class="body-area top" style="margin-top:22px">
+    <div class="cols three">
+      <div class="card">
+        <h3>The two metrics disagree on order, not just scale</h3>
+        <p>ROC-AUC spans .9211–.9777; PR-AUC spans .2306–.8783. The isolation forest outscores weighted LightGBM on ROC-AUC with a third of its PR-AUC.</p>
+      </div>
+      <div class="card">
+        <h3>The imbalance strategy outweighs the learner</h3>
+        <p>Within LightGBM alone the three strategies span 0.158 PR-AUC: .666 weighted, .670 under, .824 SMOTE. Wider than the gap between learners.</p>
+      </div>
+      <div class="card">
+        <h3>Labels are worth a lot</h3>
+        <p>The best unsupervised detector reaches .5298 against the winner's .8783. Anomaly detection alone does not close it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 16 ========================================================== -->
+<section class="slide" data-label="SMOTE beat weighting">
+  <div class="eyebrow"><b>IV-A</b><span>The leaderboard</span></div>
+  <h2 class="wide">One result that contradicts the literature</h2>
+  <div class="cols two body-area" style="margin-top:20px">
+    <div>
+      <div class="mini">
+        <div class="mhead">PR-AUC by imbalance strategy, LightGBM</div>
+        <div class="mrow"><span class="mname">lgbm/weighted</span><span class="mtrack"><b style="width:66.60%"></b></span><span class="mval">.6660</span></div>
+        <div class="mrow"><span class="mname">lgbm/under</span><span class="mtrack"><b style="width:66.96%"></b></span><span class="mval">.6696</span></div>
+        <div class="mrow"><span class="mname">lgbm/smote</span><span class="mtrack"><b style="width:82.36%"></b></span><span class="mval">.8236</span></div>
+        <div class="mrow maxis"><span class="mname"></span>
+          <span class="mtrack"><i>0</i><i>.5</i><i>1</i></span><span class="mval"></span></div>
+      </div>
+    </div>
+    <div>
+      <p>Section II-C said this should not happen: in high dimensions, for strong ensembles,
+      with the threshold tuned, SMOTE is the strategy expected to lose.</p>
+      <p>Here it won for both tree ensembles, by a margin wider than anything that separates
+      the learners themselves. The honest statement is narrower than that headline, though:
+      SMOTE beat weighting on this data, at this seed, with the strategy tuned jointly with
+      the learner. It is not a general result, and it is not offered as one.</p>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 17 ========================================================== -->
+<section class="slide" data-label="Significance">
+  <div class="eyebrow"><b>IV-B</b><span>Significance testing</span></div>
+  <h2 class="full" style="font-size:34px;margin-bottom:8px">Is the winner actually winning?</h2>
+  <p style="font-size:17px;color:var(--ink-2);margin-bottom:22px;max-width:none">
+    Corrected resampled <em>t</em>-test on 15 paired folds, Holm-adjusted, α = 0.05 fixed in advance.
+  </p>
+  <div class="body-area">
+  <p class="dlegend">
+    <span class="sw sw-band"></span>the challenger's own fold spread
+    <span class="sw sw-bar"></span>its gap to the winner
+  </p>
+  <div class="dchart">
+    <div class="drow dhead">
+      <span class="dname"></span><span class="dtrack"></span>
+      <span class="dval">Δ PR-AUC</span><span class="dt">t</span><span class="dp">p (Holm)</span>
+    </div>
+      <div class="drow"><span class="dname">rf/smote (tuned)</span><span class="dtrack"><span class="dband" style="width:20.06%"></span><b style="width:2.25%"></b></span><span class="dval">.0036</span><span class="dt">0.63</span><span class="dp">.537</span></div>
+      <div class="drow"><span class="dname">rf/smote</span><span class="dtrack"><span class="dband" style="width:20.38%"></span><b style="width:5.38%"></b></span><span class="dval">.0086</span><span class="dt">1.66</span><span class="dp">.240</span></div>
+      <div class="drow"><span class="dname">rf/weighted</span><span class="dtrack"><span class="dband" style="width:21.94%"></span><b style="width:10.31%"></b></span><span class="dval">.0165</span><span class="dt">2.20</span><span class="dp">.180</span></div>
+      <div class="drow"><span class="dname">lgbm/smote</span><span class="dtrack"><span class="dband" style="width:34.00%"></span><b style="width:34.19%"></b></span><span class="dval">.0547</span><span class="dt">2.09</span><span class="dp">.180</span></div>
+      <div class="drow"><span class="dname">lr/none (tuned)</span><span class="dtrack"><span class="dband" style="width:34.94%"></span><b style="width:89.25%"></b></span><span class="dval">.1428</span><span class="dt">7.49</span><span class="dp">1.5e−5</span></div>
+    <div class="drow daxis">
+      <span class="dname"></span><span class="dtrack"><i style="left:0.00%">0</i><i style="left:31.25%">.05</i><i style="left:62.50%">.10</i><i style="left:93.75%">.15</i></span>
+      <span class="dval"></span><span class="dt"></span><span class="dp"></span>
+    </div>
+  </div>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 18 ========================================================== -->
+<section class="slide" data-label="What the test does and does not say">
+  <div class="eyebrow"><b>IV-B</b><span>Significance testing</span></div>
+  <h2 class="wide">Four of the top five are indistinguishable</h2>
+  <div class="body-area" style="margin-top:20px">
+    <p class="lead" style="max-width:56ch">Each of those four gaps fits inside the spread
+    between folds. Only the tuned logistic regression separates, by 0.14 PR-AUC against a fold
+    spread of 0.035.</p>
+    <p class="lead" style="max-width:56ch;margin-top:22px">So the order of the top five rows is
+    not supported by the data. What ships is the top of the leaderboard, a choice made before
+    the test was run. The test does not overturn it; it says the four rows beneath would have
+    served as well.</p>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 19 ========================================================== -->
+<section class="slide" data-label="The unseen day">
+  <div class="eyebrow"><b>IV-C</b><span>Testing against the second day</span></div>
+  <h2>Day 2, touched once</h2>
+  <div class="body-area top" style="margin-top:22px">
+    <div class="ledger">
+      <div><div class="l">PR-AUC</div><div class="v">.878 → <span class="bad">.764</span></div></div>
+      <div><div class="l">recall at precision .90</div><div class="v">.859 → <span class="bad">.652</span></div></div>
+      <div><div class="l">ROC-AUC (it rises)</div><div class="v">.9754 → <span class="good">.9790</span></div></div>
+    </div>
+    <div class="cols two" style="margin-top:24px;align-items:center">
+      <div>
+    <ul class="ticks compact">
+          <li><b>Random folds are too easy.</b> Fraud arrives in bursts on the same stolen card, so two frauds are often near-identical rows and a random split puts one in train, one in test.</li>
+          <li><b>The base rate moved.</b> 0.189% on day 1 to 0.144% on day 2, a quarter fewer. PR-AUC depends on that share, so part of the drop is arithmetic.</li>
+          <li><b>The rest is real drift.</b> Two days give one split, so we cannot apportion the three.</li>
+        </ul>
+      </div>
+      <div class="plate" style="height:322px"><img src="{{fig:precision_recall}}" alt="Precision-recall curves for day-1 out-of-fold scores and the day-2 holdout, with the shipped operating point ringed."></div>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 20 ========================================================== -->
+<section class="slide part-slide" data-label="Section IV-D · The operating point">
+  <div class="part-no">Section IV-D</div>
+  <h2>The operating point and its transfer</h2>
+</section>
+
+
+
+
+
+
+
+
+<!-- 21 ========================================================== -->
+<section class="slide" data-label="Operating points">
+  <div class="eyebrow"><b>IV-D</b><span>The operating point and its transfer</span></div>
+  <h2 class="full" style="font-size:32px;margin-bottom:18px">Three objectives, and what day 2 does to the one we shipped</h2>
+  <div class="tbl-wrap">
+    <table class="compact">
+      <thead><tr><th>Operating point</th><th>Alerts</th><th>Precision</th><th>Recall</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr class="ship"><td>Day 1 OOF · cost</td><td>524</td><td>.4637</td><td>.8934</td><td>4,234</td></tr>
+        <tr><td>Day 1 OOF · precision floor .90</td><td>253</td><td>.9170</td><td>.8529</td><td>5,301</td></tr>
+        <tr><td>Day 1 OOF · budget 100</td><td>100</td><td>1.000</td><td>.3676</td><td>22,217</td></tr>
+        <tr class="dim"><td>Day 2 · same threshold</td><td>2,551</td><td>.0670</td><td>.8507</td><td>15,712</td></tr>
+        <tr class="dim"><td>Day 2 · same alert rate</td><td>507</td><td>.3195</td><td>.8060</td><td>10,680</td></tr>
+        <tr class="dim"><td>Day 2 · own optimum (hindsight)</td><td>217</td><td>.7235</td><td>.7811</td><td>9,871</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="ledger" style="margin-top:24px">
+    <div><div class="l">cost above the day-2 optimum if the threshold is held</div><div class="v bad">+59%</div></div>
+    <div><div class="l">cost above the day-2 optimum if the alert rate is held</div><div class="v good">+8%</div></div>
+  </div>
+  <p style="margin-top:20px;font-size:18.5px">
+    Neither transfer is ideal, but one is seven times less wrong. Recall held up (.851 on day 2 at the frozen threshold) while precision fell from .46 to .07. The model kept finding fraud;
+    the queue stopped being reviewable.
+  </p>
+</section>
+
+
+
+
+<!-- 22 ========================================================== -->
+<section class="slide" data-label="Cost of a review">
+  <div class="eyebrow"><b>III-F</b><span>Threshold, calibration and interpretation</span></div>
+  <div class="cols fig body-area" style="margin-top:6px">
+    <div class="plate tall"><img src="{{fig:cost_vs_alerts}}" alt="Cost against alert volume, showing the optimum recomputed across review costs."></div>
+    <div>
+      <h2 style="font-size:32px">The price of a review is an assumption</h2>
+      <p style="font-size:18px">Raising c<sub>review</sub> a hundredfold moves the threshold from
+      <span class="num">0.0169</span> to <span class="num">0.9919</span>, almost the whole
+      interval.</p>
+      <p style="font-size:18px">The queue only shrinks from <span class="num">524</span> to
+      <span class="num">233</span> alerts, and recall from <span class="num">.893</span> to
+      <span class="num">.824</span>.</p>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 23 ========================================================== -->
+<section class="slide" data-label="Recall counts frauds, not money">
+  <div class="eyebrow"><b>IV-D</b><span>The operating point and its transfer</span></div>
+  <div class="cols fig body-area" style="margin-top:6px">
+    <div class="plate tall"><img src="{{fig:missed_frauds}}" alt="Every day-2 fraud plotted by amount against score; caught in green, missed in red."></div>
+    <div>
+      <h2 style="font-size:32px;margin-bottom:16px">Recall counts frauds, not money</h2>
+      <p style="font-size:20px;line-height:1.5">Day-2 queue: 2,551 alerts, 171 of them fraud. The
+      <span class="hl">30 frauds that get through</span> are 14.9% of the count but
+      <span class="hl">32.8% of the fraudulent amount</span>.</p>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 24 ========================================================== -->
+<section class="slide" data-label="Calibration">
+  <div class="eyebrow"><b>IV-F</b><span>Calibration</span></div>
+  <div class="cols fig body-area" style="margin-top:6px">
+    <div class="plate tall"><img src="{{fig:reliability}}" alt="Reliability curve: predicted probability against observed day-2 fraud rate, raw and sigmoid-calibrated."></div>
+    <div>
+      <h2 style="font-size:32px">A threshold needs order. A probability needs truth.</h2>
+      <p style="font-size:18px">SMOTE trains the model on a world where fraud is common, so the
+      raw scores overstate risk by <span class="bad">2.7×</span>: mean score
+      <span class="num">.003821</span> against a real rate of <span class="num">.001441</span>.</p>
+      <div class="ledger" style="margin-top:16px">
+        <div style="padding-left:0"><div class="l">Brier, raw</div><div class="v">.001283</div></div>
+        <div><div class="l">Brier, sigmoid</div><div class="v good">.000526</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 25 ========================================================== -->
+<section class="slide" data-label="Interpretation">
+  <div class="eyebrow"><b>IV-E</b><span>Interpretation</span></div>
+  <div class="cols fig body-area" style="margin-top:6px">
+    <div class="plate tall"><img src="{{fig:shap_beeswarm}}" alt="SHAP beeswarm over all day-2 frauds plus 4,000 sampled legitimate rows."></div>
+    <div>
+      <h2 style="font-size:32px">The decision rests on a handful of features</h2>
+      <p class="tbl-note" style="margin:10px 0 0">SHAP with the exact tree explainer</p>
+      <p style="font-size:18px"><code>V14</code> alone carries <span class="hl">33.5%</span> of
+      the total attribution; the top five carry <span class="hl">62.4%</span>. Its low values push
+      hardest towards fraud, further than any other feature.</p>
+      <p style="font-size:18px">Our own features earn a modest place: <code>hour</code> is 13th
+      at 1.7%, <code>log_amount</code> 16th at 1.3%, below fourteen PCA components.</p>
+      <p style="font-size:18px;color:var(--ink-2)">Frauds are deliberately over-represented in the
+      sample, so the ranking answers "what separates the classes". And since the PCA was never
+      published, we can say which features matter, not what they mean.</p>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 26 ========================================================== -->
+<section class="slide part-slide" data-label="Section V · Discussion">
+  <div class="part-no">Section V</div>
+  <h2>Discussion and limitations</h2>
+</section>
+
+
+
+
+
+
+
+
+<!-- 27 ========================================================== -->
+<section class="slide" data-label="Limitations">
+  <div class="eyebrow"><b>V</b><span>Discussion and limitations</span></div>
+  <h2 class="full">Where the evidence stops</h2>
+  <div class="body-area top" style="margin-top:24px">
+    <div class="cols five">
+      <div class="card" style="border-top-color:var(--bad)">
+        <span class="k">The binding constraint</span>
+        <h3>473 frauds, 272 trainable</h3>
+        <p>This is why the CV is repeated, why a fold spread is quoted with every mean, why the test needs a variance correction, and why calibration is sigmoid.</p>
+      </div>
+      <div class="card" style="border-top-color:var(--bad)">
+        <span class="k">Structural</span>
+        <h3>Two days is one split</h3>
+        <p>One drift measurement, no seasonality, no verification latency: a fraud is labelled here the instant it happens, which is not how it works.</p>
+      </div>
+      <div class="card" style="border-top-color:var(--bad)">
+        <span class="k">Assumed, not measured</span>
+        <h3>The cost model</h3>
+        <p>A miss priced at the full amount, a review at a flat 3. No recovery, no chargeback fees, no cost for a wrongly-blocked customer.</p>
+      </div>
+      <div class="card" style="border-top-color:var(--bad)">
+        <span class="k">Undiagnosable</span>
+        <h3>Anonymised features</h3>
+        <p>A PCA that was never published rules out every domain check, so the expensive misses cannot be explained, only counted.</p>
+      </div>
+      <div class="card" style="border-top-color:var(--bad)">
+        <span class="k">Untested</span>
+        <h3>The unsupervised branch</h3>
+        <p>The literature finds value in <em>combining</em> outlier scores with a supervised model rather than choosing between them. We chose.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+
+
+
+<!-- 28 ========================================================== -->
+<section class="slide" data-label="Conclusions">
+  <div class="eyebrow"><b>VII</b><span>Conclusions</span></div>
+  <h2>Three things to take away</h2>
+  <div class="body-area top" style="margin-top:24px">
+    <ul class="ticks">
+      <li><b>At a 0.167% positive rate, ROC-AUC cannot separate a deployable ranker from an unusable one.</b>
+      It varied eleven times less than PR-AUC across the sixteen real candidates, inverted their order
+      outright, and improved across the split on which precision fell sevenfold.</li>
+      <li><b>The winner is a winner by leaderboard order, not by evidence.</b>
+      Tuned LightGBM over SMOTE (.878 ± .035 in CV, .764 on the holdout), but the corrected paired
+      test cannot separate it from four challengers, where the uncorrected test would have separated four.
+      The resampling strategy proved worth more than the learner.</li>
+      <li><b>Specify alert volume, not a probability cut-off.</b>
+      Carried to day 2 the frozen threshold held recall and dropped precision from .46 to .07, raising
+      2,551 alerts against day 2's own optimum of 217.</li>
+    </ul>
+  </div>
+</section>
+
+
+
+
+
+
+<!-- 29 ========================================================== -->
+<section class="slide thanks" data-label="Thank you">
+  <h1>Thank you!</h1>
+  <p class="thanks-link">github.com/ITHackerstein/needle</p>
+</section>
+
+
+<div id="chrome">
+  <span id="counter">01 / 29</span>
+  <div id="rail" role="tablist" aria-label="Slides"></div>
+</div>
+<button class="nav prev" id="prev" aria-label="Previous slide"></button>
+<button class="nav next" id="next" aria-label="Next slide"></button>
+<p id="hint">← → to navigate</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  var stage = document.getElementById("stage");
+  var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var rail = document.getElementById("rail");
+  var counter = document.getElementById("counter");
+  var hint = document.getElementById("hint");
+  var seen = 0;
+  var i = 0;
+
+  // NOTE: one rail tick per slide, doubling as a jump target.
+  slides.forEach(function(s, n){
+    var b = document.createElement("button");
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-label", "Slide " + (n + 1) + ": " + s.dataset.label);
+    b.addEventListener("click", function(){ go(n); });
+    rail.appendChild(b);
+  });
+  var ticks = Array.prototype.slice.call(rail.children);
+
+  function pad(n){ return (n < 10 ? "0" : "") + n; }
+
+  function go(n){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    seen = Math.max(seen, i);
+    slides.forEach(function(s, k){ s.classList.toggle("is-active", k === i); });
+    ticks.forEach(function(t, k){
+      t.classList.toggle("here", k === i);
+      t.classList.toggle("seen", k < i);
+      t.setAttribute("aria-selected", k === i ? "true" : "false");
+    });
+    stage.setAttribute("data-at", String(i));
+    counter.textContent = pad(i + 1) + " / " + slides.length;
+    if (i > 0) hint.classList.add("gone");
+    if (location.hash !== "#" + (i + 1)) {
+      try { history.replaceState(null, "", "#" + (i + 1)); } catch (e) {}
+    }
+  }
+
+  function fit(){
+    var k = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    stage.style.transform = "translate(-50%,-50%) scale(" + k + ")";
+  }
+
+  document.addEventListener("keydown", function(e){
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var k = e.key;
+    if (k === "ArrowRight" || k === "ArrowDown" || k === " " || k === "PageDown" || k === "n") { go(i + 1); e.preventDefault(); }
+    else if (k === "ArrowLeft" || k === "ArrowUp" || k === "PageUp" || k === "p") { go(i - 1); e.preventDefault(); }
+    else if (k === "Home") { go(0); e.preventDefault(); }
+    else if (k === "End") { go(slides.length - 1); e.preventDefault(); }
+  });
+
+  document.getElementById("next").addEventListener("click", function(){ go(i + 1); });
+  document.getElementById("prev").addEventListener("click", function(){ go(i - 1); });
+  window.addEventListener("resize", fit);
+
+  // NOTE: 578 negatives per positive: the grid is that ratio, not a decoration.
+  Array.prototype.forEach.call(document.querySelectorAll(".haystack"), function(hay){
+    var frag = document.createDocumentFragment();
+    for (var d = 0; d < 579; d++) {
+      var dot = document.createElement("i");
+      if (d === 401) dot.className = "pos";
+      frag.appendChild(dot);
+    }
+    hay.appendChild(frag);
+  });
+
+  fit();
+  var start = parseInt((location.hash || "").slice(1), 10);
+  go(isFinite(start) && start > 0 ? start - 1 : 0);
+})();
+</script>

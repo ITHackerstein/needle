@@ -19,3 +19,7 @@ dataset/
 
 # reports
 reports/
+
+# generated from docs/slides.html by docs/build_slides.py
+docs/slides.build.html
+docs/slides.print.html
