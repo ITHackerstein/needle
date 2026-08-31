@@ -1,5 +1,6 @@
 <!-- AI DISCLAIMER: this presentation was written with the assistance of
      Claude (Anthropic), directed by the author. -->
+<meta charset="utf-8">
 <title>Needle</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -440,7 +441,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 <section class="slide title-slide" data-label="Title">
   <div class="title-left">
     <div>
-      <div class="eyebrow" style="margin-bottom:34px"><span>Università degli Studi di Bari Aldo Moro</span></div>
+      <div class="eyebrow" style="margin-bottom:34px"><span>Universit&agrave; degli Studi di Bari Aldo Moro</span></div>
       <h1>needle</h1>
       <p class="lead" style="font-size:26px;max-width:24ch;margin-top:20px">
         Cost-aware credit card fraud detection under extreme class imbalance
@@ -464,7 +465,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 <!-- 2 =========================================================== -->
-<section class="slide part-slide" data-label="Section I · Introduction">
+<section class="slide part-slide" data-label="Section I &middot; Introduction">
   <div class="part-no">Section I</div>
   <h2>Introduction</h2>
 </section>
@@ -524,7 +525,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 <!-- 5 =========================================================== -->
-<section class="slide part-slide" data-label="Section II · Related work">
+<section class="slide part-slide" data-label="Section II &middot; Related work">
   <div class="part-no">Section II</div>
   <h2>Related work</h2>
 </section>
@@ -578,17 +579,17 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
   <div class="body-area top" style="margin-top:22px">
     <div class="cols three">
       <div class="card">
-        <span class="k">II-B · Evaluation</span>
+        <span class="k">II-B &middot; Evaluation</span>
         <h3>ROC and PR space weight the same errors differently</h3>
         <p>Established for classification in general, then argued directly for skewed data. The decision-theoretic basis for taking a threshold from costs rather than from a metric is older still.</p>
       </div>
       <div class="card">
-        <span class="k">II-C · Resampling</span>
+        <span class="k">II-C &middot; Resampling</span>
         <h3>SMOTE is expected to lose to class weighting</h3>
         <p>Its benefit largely vanishes in high dimensions where the minority class is not locally dense, and it rarely beats weighting for strong ensembles once the threshold is tuned.</p>
       </div>
       <div class="card">
-        <span class="k">II-D · Leakage</span>
+        <span class="k">II-D &middot; Leakage</span>
         <h3>Four failures recur in work on this dataset</h3>
         <ul>
           <li>preprocessing applied before the split</li>
@@ -613,7 +614,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 <!-- 8 =========================================================== -->
-<section class="slide part-slide" data-label="Section III · Methodology">
+<section class="slide part-slide" data-label="Section III &middot; Methodology">
   <div class="part-no">Section III</div>
   <h2>Methodology</h2>
 </section>
@@ -633,7 +634,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
     <div>
       <ul class="ticks">
         <li><b>PR-AUC</b> is the primary metric, because it answers to the minority class and so moves when the model does.</li>
-        <li><b>Recall at precision ≥ 0.90</b> reports what a review team actually experiences at a tolerable rate of false alarms.</li>
+        <li><b>Recall at precision &ge; 0.90</b> reports what a review team actually experiences at a tolerable rate of false alarms.</li>
         <li><b>An amount-weighted cost</b> decides between the survivors, pricing every missed fraud at its own amount and every false alarm at one review.</li>
       </ul>
     </div>
@@ -701,7 +702,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
   <h2>Three feature decisions</h2>
   <div class="body-area top" style="margin-top:26px">
     <ul class="ticks" style="font-size:20px">
-      <li><b><code>V1</code>–<code>V28</code></b> are left untouched, because they already come out of a PCA and are therefore scaled and uncorrelated.</li>
+      <li><b><code>V1</code>&ndash;<code>V28</code></b> are left untouched, because they already come out of a PCA and are therefore scaled and uncorrelated.</li>
       <li><b><code>Amount</code></b> becomes <span class="m">log_amount = log(1 + Amount)</span> and then passes through a RobustScaler, since the tail is heavy and the outliers are the rows we care about.</li>
       <li><b><code>Time</code></b> becomes <span class="m">hour = (Time / 3600) mod 24</span>, because a raw second offset across two days is an index rather than a signal.</li>
     </ul>
@@ -748,7 +749,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 <!-- 13 ========================================================== -->
-<section class="slide part-slide" data-label="Section IV · Results">
+<section class="slide part-slide" data-label="Section IV &middot; Results">
   <div class="part-no">Section IV</div>
   <h2>Results</h2>
 </section>
@@ -765,7 +766,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
   <div class="eyebrow" style="margin-bottom:12px"><b>IV-A</b><span>The leaderboard</span></div>
   <h2 class="full" style="font-size:30px;margin-bottom:20px">All seventeen candidates, ranked by PR-AUC</h2>
   <div class="sm">
-      <span></span><span class="pt">PR-AUC</span><span class="pt">Recall at precision ≥ .90</span><span class="pt">ROC-AUC</span>
+      <span></span><span class="pt">PR-AUC</span><span class="pt">Recall at precision &ge; .90</span><span class="pt">ROC-AUC</span>
       <span class="sname win">lgbm/smote (tuned)</span>
       <span class="st"><b style="width:87.83%"></b><span class="wl" style="left:84.36%;width:3.47%"></span><span class="wr" style="left:87.83%;width:3.47%"></span><em>.8783</em></span>
       <span class="st"><b style="width:85.93%"></b><em>.8593</em></span>
@@ -853,7 +854,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
     <div class="cols three">
       <div class="card">
         <h3>The two metrics disagree on order, not just scale</h3>
-        <p>ROC-AUC spans .9211–.9777; PR-AUC spans .2306–.8783. The isolation forest outscores weighted LightGBM on ROC-AUC with a third of its PR-AUC.</p>
+        <p>ROC-AUC spans .9211&ndash;.9777; PR-AUC spans .2306&ndash;.8783. The isolation forest outscores weighted LightGBM on ROC-AUC with a third of its PR-AUC.</p>
       </div>
       <div class="card">
         <h3>The imbalance strategy outweighs the learner</h3>
@@ -912,7 +913,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
   <div class="eyebrow"><b>IV-B</b><span>Significance testing</span></div>
   <h2 class="full" style="font-size:34px;margin-bottom:8px">Is the winner actually winning?</h2>
   <p style="font-size:17px;color:var(--ink-2);margin-bottom:22px;max-width:none">
-    Corrected resampled <em>t</em>-test on 15 paired folds, Holm-adjusted, α = 0.05 fixed in advance.
+    Corrected resampled <em>t</em>-test on 15 paired folds, Holm-adjusted, &alpha; = 0.05 fixed in advance.
   </p>
   <div class="body-area">
   <p class="dlegend">
@@ -922,13 +923,13 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
   <div class="dchart">
     <div class="drow dhead">
       <span class="dname"></span><span class="dtrack"></span>
-      <span class="dval">Δ PR-AUC</span><span class="dt">t</span><span class="dp">p (Holm)</span>
+      <span class="dval">&Delta; PR-AUC</span><span class="dt">t</span><span class="dp">p (Holm)</span>
     </div>
       <div class="drow"><span class="dname">rf/smote (tuned)</span><span class="dtrack"><span class="dband" style="width:20.06%"></span><b style="width:2.25%"></b></span><span class="dval">.0036</span><span class="dt">0.63</span><span class="dp">.537</span></div>
       <div class="drow"><span class="dname">rf/smote</span><span class="dtrack"><span class="dband" style="width:20.38%"></span><b style="width:5.38%"></b></span><span class="dval">.0086</span><span class="dt">1.66</span><span class="dp">.240</span></div>
       <div class="drow"><span class="dname">rf/weighted</span><span class="dtrack"><span class="dband" style="width:21.94%"></span><b style="width:10.31%"></b></span><span class="dval">.0165</span><span class="dt">2.20</span><span class="dp">.180</span></div>
       <div class="drow"><span class="dname">lgbm/smote</span><span class="dtrack"><span class="dband" style="width:34.00%"></span><b style="width:34.19%"></b></span><span class="dval">.0547</span><span class="dt">2.09</span><span class="dp">.180</span></div>
-      <div class="drow"><span class="dname">lr/none (tuned)</span><span class="dtrack"><span class="dband" style="width:34.94%"></span><b style="width:89.25%"></b></span><span class="dval">.1428</span><span class="dt">7.49</span><span class="dp">1.5e−5</span></div>
+      <div class="drow"><span class="dname">lr/none (tuned)</span><span class="dtrack"><span class="dband" style="width:34.94%"></span><b style="width:89.25%"></b></span><span class="dval">.1428</span><span class="dt">7.49</span><span class="dp">1.5e&minus;5</span></div>
     <div class="drow daxis">
       <span class="dname"></span><span class="dtrack"><i style="left:0.00%">0</i><i style="left:31.25%">.05</i><i style="left:62.50%">.10</i><i style="left:93.75%">.15</i></span>
       <span class="dval"></span><span class="dt"></span><span class="dp"></span>
@@ -972,9 +973,9 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
   <h2>Day 2, touched once</h2>
   <div class="body-area top" style="margin-top:22px">
     <div class="ledger">
-      <div><div class="l">PR-AUC</div><div class="v">.878 → <span class="bad">.764</span></div></div>
-      <div><div class="l">recall at precision .90</div><div class="v">.859 → <span class="bad">.652</span></div></div>
-      <div><div class="l">ROC-AUC (it rises)</div><div class="v">.9754 → <span class="good">.9790</span></div></div>
+      <div><div class="l">PR-AUC</div><div class="v">.878 &rarr; <span class="bad">.764</span></div></div>
+      <div><div class="l">recall at precision .90</div><div class="v">.859 &rarr; <span class="bad">.652</span></div></div>
+      <div><div class="l">ROC-AUC (it rises)</div><div class="v">.9754 &rarr; <span class="good">.9790</span></div></div>
     </div>
     <div class="cols two" style="margin-top:24px;align-items:center">
       <div>
@@ -997,7 +998,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 <!-- 20 ========================================================== -->
-<section class="slide part-slide" data-label="Section IV-D · The operating point">
+<section class="slide part-slide" data-label="Section IV-D &middot; The operating point">
   <div class="part-no">Section IV-D</div>
   <h2>The operating point and its transfer</h2>
 </section>
@@ -1017,12 +1018,12 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
     <table class="compact">
       <thead><tr><th>Operating point</th><th>Alerts</th><th>Precision</th><th>Recall</th><th>Cost</th></tr></thead>
       <tbody>
-        <tr class="ship"><td>Day 1 OOF · cost</td><td>524</td><td>.4637</td><td>.8934</td><td>4,234</td></tr>
-        <tr><td>Day 1 OOF · precision floor .90</td><td>253</td><td>.9170</td><td>.8529</td><td>5,301</td></tr>
-        <tr><td>Day 1 OOF · budget 100</td><td>100</td><td>1.000</td><td>.3676</td><td>22,217</td></tr>
-        <tr class="dim"><td>Day 2 · same threshold</td><td>2,551</td><td>.0670</td><td>.8507</td><td>15,712</td></tr>
-        <tr class="dim"><td>Day 2 · same alert rate</td><td>507</td><td>.3195</td><td>.8060</td><td>10,680</td></tr>
-        <tr class="dim"><td>Day 2 · own optimum (hindsight)</td><td>217</td><td>.7235</td><td>.7811</td><td>9,871</td></tr>
+        <tr class="ship"><td>Day 1 OOF &middot; cost</td><td>524</td><td>.4637</td><td>.8934</td><td>4,234</td></tr>
+        <tr><td>Day 1 OOF &middot; precision floor .90</td><td>253</td><td>.9170</td><td>.8529</td><td>5,301</td></tr>
+        <tr><td>Day 1 OOF &middot; budget 100</td><td>100</td><td>1.000</td><td>.3676</td><td>22,217</td></tr>
+        <tr class="dim"><td>Day 2 &middot; same threshold</td><td>2,551</td><td>.0670</td><td>.8507</td><td>15,712</td></tr>
+        <tr class="dim"><td>Day 2 &middot; same alert rate</td><td>507</td><td>.3195</td><td>.8060</td><td>10,680</td></tr>
+        <tr class="dim"><td>Day 2 &middot; own optimum (hindsight)</td><td>217</td><td>.7235</td><td>.7811</td><td>9,871</td></tr>
       </tbody>
     </table>
   </div>
@@ -1092,7 +1093,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
     <div>
       <h2 style="font-size:32px">A threshold needs order. A probability needs truth.</h2>
       <p style="font-size:18px">SMOTE trains the model on a world where fraud is common, so the
-      raw scores overstate risk by <span class="bad">2.7×</span>: mean score
+      raw scores overstate risk by <span class="bad">2.7&times;</span>: mean score
       <span class="num">.003821</span> against a real rate of <span class="num">.001441</span>.</p>
       <div class="ledger" style="margin-top:16px">
         <div style="padding-left:0"><div class="l">Brier, raw</div><div class="v">.001283</div></div>
@@ -1137,7 +1138,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 <!-- 26 ========================================================== -->
-<section class="slide part-slide" data-label="Section V · Discussion">
+<section class="slide part-slide" data-label="Section V &middot; Discussion">
   <div class="part-no">Section V</div>
   <h2>Discussion and limitations</h2>
 </section>
@@ -1201,7 +1202,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
       It varied eleven times less than PR-AUC across the sixteen real candidates, inverted their order
       outright, and improved across the split on which precision fell sevenfold.</li>
       <li><b>The winner is a winner by leaderboard order, not by evidence.</b>
-      Tuned LightGBM over SMOTE (.878 ± .035 in CV, .764 on the holdout), but the corrected paired
+      Tuned LightGBM over SMOTE (.878 &plusmn; .035 in CV, .764 on the holdout), but the corrected paired
       test cannot separate it from four challengers, where the uncorrected test would have separated four.
       The resampling strategy proved worth more than the learner.</li>
       <li><b>Specify alert volume, not a probability cut-off.</b>
@@ -1229,7 +1230,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 </div>
 <button class="nav prev" id="prev" aria-label="Previous slide"></button>
 <button class="nav next" id="next" aria-label="Next slide"></button>
-<p id="hint">← → to navigate</p>
+<p id="hint">&larr; &rarr; to navigate</p>
   </div>
 </div>
 

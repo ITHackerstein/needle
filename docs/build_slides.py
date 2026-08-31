@@ -30,7 +30,7 @@ def main():
     # this copy is the one to open and Ctrl+P into a PDF.
     head, body = html.split('<div id="viewport">', 1)
     PRINT.write_text(
-        '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+        '<!doctype html>\n<html lang="en">\n<head>\n'
         + head + '</head>\n<body>\n<div id="viewport">' + body + "\n</body>\n</html>\n"
     )
     print("wrote", OUT, "({} KiB, {} figures)".format(len(html) // 1024, len(used)))
