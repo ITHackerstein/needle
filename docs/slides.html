@@ -1042,17 +1042,58 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 <!-- 22 ========================================================== -->
 <section class="slide" data-label="Cost of a review">
-  <div class="eyebrow"><b>III-F</b><span>Threshold, calibration and interpretation</span></div>
-  <div class="cols fig body-area" style="margin-top:6px">
-    <div class="plate tall"><img src="{{fig:cost_vs_alerts}}" alt="Cost against alert volume, showing the optimum recomputed across review costs."></div>
+  <div class="eyebrow"><b>IV-D</b><span>The operating point and its transfer</span></div>
+  <h2 class="full" style="font-size:32px;margin-bottom:20px">The price of a review is an assumption, so the optimum is recomputed against it</h2>
+  <div class="body-area">
+  <div class="cols two" style="gap:48px;align-items:center">
     <div>
-      <h2 style="font-size:32px">The price of a review is an assumption</h2>
-      <p style="font-size:18px">Raising c<sub>review</sub> a hundredfold moves the threshold from
-      <span class="num">0.0169</span> to <span class="num">0.9919</span>, almost the whole
-      interval.</p>
-      <p style="font-size:18px">The queue only shrinks from <span class="num">524</span> to
-      <span class="num">233</span> alerts, and recall from <span class="num">.893</span> to
-      <span class="num">.824</span>.</p>
+      <p style="font-size:18.5px">The cost model prices a missed fraud at the full transaction
+      amount and a review at a flat <span class="num">3</span>. Recovery, chargeback fees and the
+      cost of a wrongly blocked customer are all missing, so
+      <span class="m">c<sub>review</sub></span> is a number we chose, not one we measured.</p>
+      <p style="font-size:18.5px">Every run therefore re-selects the cost optimum over
+      <span class="m">c<sub>review</sub></span> &isin;
+      <span class="num" style="white-space:nowrap">{1, 3, 5, 10, 30, 100}</span> instead of
+      trusting the shipped value.</p>
+    </div>
+    <div class="tbl-wrap">
+      <table class="compact">
+        <thead><tr><th></th><th>Review cost 1</th><th>Review cost 100</th></tr></thead>
+        <tbody>
+          <tr><td>Threshold</td><td>0.0169</td><td>0.9919</td></tr>
+          <tr><td>Alerts</td><td>524</td><td>233</td></tr>
+          <tr><td>Precision</td><td>.46</td><td>.96</td></tr>
+          <tr><td>Recall</td><td>.893</td><td>.824</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p style="margin-top:30px;font-size:18.5px;max-width:none">A hundredfold rise in the price of a
+  review sweeps the cut-off across almost the whole interval, but the queue shrinks by less than
+  half and recall gives up seven points.</p>
+  </div>
+</section>
+
+
+
+
+<!-- 23 ========================================================== -->
+<section class="slide" data-label="Cost against queue size">
+  <div class="eyebrow"><b>IV-D</b><span>The operating point and its transfer</span></div>
+  <div class="cols fig body-area" style="margin-top:6px">
+    <div class="plate tall"><img src="{{fig:cost_vs_alerts}}" alt="Day-2 cost against queue size on a log axis, with the frozen day-1 threshold marked at 2,551 alerts and cost 15,712."></div>
+    <div>
+      <h2 style="font-size:32px;margin-bottom:16px">The frozen threshold costs 59% more than the
+      day-2 optimum</h2>
+      <p style="font-size:18px">The floor is broad: the day-2 optimum sits at
+      <span class="num">217</span> alerts and costs <span class="num">9,871</span>, and
+      <span class="num">507</span> alerts still cost only <span class="num">10,680</span>. The
+      marked point is the day-1 threshold carried unchanged, far up the right-hand wall:
+      <span class="num">2,551</span> alerts at <span class="num">15,712</span>,
+      <span class="hl">+59%</span>.</p>
+      <p style="font-size:18px;color:var(--ink-2)">The left-hand plateau is the whole day-2
+      fraudulent amount, about <span class="num">26,000</span>: the cost of alerting on nothing.
+      Inside the flat stretch the exact queue length hardly matters; leaving it does.</p>
     </div>
   </div>
 </section>
@@ -1064,7 +1105,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 
-<!-- 23 ========================================================== -->
+<!-- 24 ========================================================== -->
 <section class="slide" data-label="Recall counts frauds, not money">
   <div class="eyebrow"><b>IV-D</b><span>The operating point and its transfer</span></div>
   <div class="cols fig body-area" style="margin-top:6px">
@@ -1085,7 +1126,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 
-<!-- 24 ========================================================== -->
+<!-- 25 ========================================================== -->
 <section class="slide" data-label="Calibration">
   <div class="eyebrow"><b>IV-F</b><span>Calibration</span></div>
   <div class="cols fig body-area" style="margin-top:6px">
@@ -1110,7 +1151,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 
-<!-- 25 ========================================================== -->
+<!-- 26 ========================================================== -->
 <section class="slide" data-label="Interpretation">
   <div class="eyebrow"><b>IV-E</b><span>Interpretation</span></div>
   <div class="cols fig body-area" style="margin-top:6px">
@@ -1137,7 +1178,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 
-<!-- 26 ========================================================== -->
+<!-- 27 ========================================================== -->
 <section class="slide part-slide" data-label="Section V &middot; Discussion">
   <div class="part-no">Section V</div>
   <h2>Discussion and limitations</h2>
@@ -1150,7 +1191,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 
-<!-- 27 ========================================================== -->
+<!-- 28 ========================================================== -->
 <section class="slide" data-label="Limitations">
   <div class="eyebrow"><b>V</b><span>Discussion and limitations</span></div>
   <h2 class="full">Where the evidence stops</h2>
@@ -1192,7 +1233,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 
-<!-- 28 ========================================================== -->
+<!-- 29 ========================================================== -->
 <section class="slide" data-label="Conclusions">
   <div class="eyebrow"><b>VII</b><span>Conclusions</span></div>
   <h2>Three things to take away</h2>
@@ -1217,7 +1258,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 
-<!-- 29 ========================================================== -->
+<!-- 30 ========================================================== -->
 <section class="slide thanks" data-label="Thank you">
   <h1>Thank you!</h1>
   <p class="thanks-link">github.com/ITHackerstein/needle</p>
@@ -1225,7 +1266,7 @@ ul.ticks li b{color:var(--ink);font-weight:500;font-family:var(--f-body)}
 
 
 <div id="chrome">
-  <span id="counter">01 / 29</span>
+  <span id="counter">01 / 30</span>
   <div id="rail" role="tablist" aria-label="Slides"></div>
 </div>
 <button class="nav prev" id="prev" aria-label="Previous slide"></button>
